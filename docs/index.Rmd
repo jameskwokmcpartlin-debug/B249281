@@ -4,26 +4,94 @@ output: html_document
 date: "2025-11-12"
 ---
 
+This project aims to look at trends in the prescribing of dry eye disease (DED) medication across the year.
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+Loading libraries
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+library(tidyverse)
+library(janitor)
 ```
 
-## Including Plots
+Loading dataframes that include data of prescriptions from January to December 2024, then binding the 2 data frames to create a single data frame of prescriptions in 2024, which is then cleaned.
 
-You can also embed plots, for example:
+```{r}
+dbb_jan_jun_2024 <- read.csv("https://www.opendata.nhs.scot/dataset/84393984-14e9-4b0d-a797-b288db64d088/resource/f0df380b-3f9b-4536-bb87-569e189b727a/download/hb_pitc2024_01_06-1.csv")
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+dbb_july_dec_2024 <- read.csv("https://www.opendata.nhs.scot/dataset/84393984-14e9-4b0d-a797-b288db64d088/resource/f3b9f2e2-66c0-4310-9b8e-734781d2ed0a/download/hb_pitc2024_07_12-1.csv")
+
+dbb_jan_jun_2024$DMDCode <- as.character(dbb_jan_jun_2024$DMDCode)
+
+dbb_2024 <- bind_rows(dbb_jan_jun_2024, dbb_july_dec_2024)
+
+dbb_2024 <- dbb_2024 %>%
+  clean_names()
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+A new dataframe is created from the single data frame of 2024 by filtering for dry eye medication by looking for medications that include "TEAR" in their description.
+
+```{r}
+dry_eye_dbb_2024 <- dbb_2024 %>%
+  filter(
+    grepl("TEAR", bnf_item_description, ignore.case = TRUE)
+    )
+```
+
+This new dataframe is then grouped by month, to determine the quantity of prescriptions given over each month.
+
+```{r}
+grouped_data <- dry_eye_dbb_2024 %>%
+  group_by(paid_date_month) %>%
+  summarise(
+    total_paid_quantity = sum(paid_quantity),
+  )
+```
+
+The months are originally given in an unpresentable form as "2024XX", which is unsuitable for a plot, so a new column is added with the corresponding last numbers, and they are then individually assigned the month's name as a string and assigned levels in order for the graph to present the months in the correct order.
+
+The graph is then plotted using ggplot.
+
+```{r}
+grouped_data <- grouped_data %>%
+  mutate(
+    month = paid_date_month %% 100,  # Extract month part from YYYYMM
+    month_name = case_when(
+      month == 1  ~ "January",
+      month == 2  ~ "February",
+      month == 3  ~ "March",
+      month == 4  ~ "April",
+      month == 5  ~ "May",
+      month == 6  ~ "June",
+      month == 7  ~ "July",
+      month == 8  ~ "August",
+      month == 9  ~ "September",
+      month == 10 ~ "October",
+      month == 11 ~ "November",
+      month == 12 ~ "December"
+    ),
+
+    month_name = factor(month_name, levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"))
+  )
+
+# Plotting with both points and lines
+ggplot(grouped_data, aes(x = month_name, y = total_paid_quantity)) +
+  geom_line(group = 1) + 
+  geom_point() +
+  labs(
+    title = "Paid Quantity of Dry Eye Disease Medication over each Month",
+    x = "Month",
+    y = "Total Paid Quantity"
+  )
+```
+
+Moving forward, I would like to include data from several years instead of just 2024.
+
+Then, I would like to look specifically at the seasons and see if there are links to other medications such as allergy medications that may be causing dry eyes.
+
+Additionally looking at geographical location through health-boards as well as age's impact on usage of dry eye medication.
+
+Seasonal weather and air quality?
