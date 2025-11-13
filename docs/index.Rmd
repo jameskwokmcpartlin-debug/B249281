@@ -4,7 +4,7 @@ output: html_document
 date: "2025-11-12"
 ---
 
-This project aims to look at trends in the prescribing of dry eye disease (DED) medication across different seasons in Scotland.
+This project aims to look at "trends in the prescribing of dry eye disease medication across different seasons in Scotland."
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -17,7 +17,7 @@ library(tidyverse)
 library(janitor)
 ```
 
-Loading dataframes that include data of prescriptions from January to December 2024, then binding the 2 data frames to create a single data frame of prescriptions in 2024, which is then cleaned.
+Firstly, dataframes are loaded that include data of prescriptions from January to June and July to December in 2024. These dataframes are then bound together to create a single dataframe that represents the total prescriptions in 2024, which is then cleaned.
 
 ```{r}
 dbb_jan_jun_2024 <- read.csv("https://www.opendata.nhs.scot/dataset/84393984-14e9-4b0d-a797-b288db64d088/resource/f0df380b-3f9b-4536-bb87-569e189b727a/download/hb_pitc2024_01_06-1.csv")
@@ -32,33 +32,27 @@ dbb_2024 <- dbb_2024 %>%
   clean_names()
 ```
 
-A new dataframe is created from the single data frame of 2024 by filtering for dry eye medication by looking for medications that include "TEAR" in their description.
+Next, looking at the BNF Code Information - Current - October 2025 Version 88, available through this link: <https://opendata.nhsbsa.net/dataset/bnf-code-information-current-year/resource/0a2aa4d6-f4af-4adb-9c0a-ac5bc5490b23?filters=>, it is possible to filter for BNF_CHAPTER "Eye", then further filter for BNF_SUBPARAGRAPH "Tear deficiency, eye lubricant/astringent", which then reveals that the BNF item code for DED medication begins with the digits 110801, which can be used to specifically identify dry eye disease (DED) medication in the dataframe that represents total prescriptions in 2024.
 
 ```{r}
-dry_eye_dbb_2024 <- dbb_2024 %>%
-  filter(
-    grepl("TEAR", bnf_item_description, ignore.case = TRUE)
-    )
+DED_med_dbb_2024 <- dbb_2024 %>%
+  filter(grepl("110801", bnf_item_code))
 ```
 
-This new dataframe is then grouped by month, to determine the quantity of prescriptions given over each month.
+This dataframe that has identified the DED medications can then be grouped by month then summed to find the total quantity of prescriptions of DED medication for each month.
 
 ```{r}
-grouped_data <- dry_eye_dbb_2024 %>%
+grouped_DED_med <- DED_med_dbb_2024 %>%
   group_by(paid_date_month) %>%
-  summarise(
-    total_paid_quantity = sum(paid_quantity),
-  )
+    summarise(total_paid_quantity = sum(paid_quantity))
 ```
 
-The months are originally given in an unpresentable form as "2024XX", which is unsuitable for a plot, so a new column is added with the corresponding last numbers, and they are then individually assigned the month's name as a string and assigned levels in order for the graph to present the months in the correct order.
-
-The graph is then plotted using ggplot.
+The months are originally given in an unpresentable form as "2024XX", which is unsuitable for a plot, so a new column is added with the corresponding last numbers, and they are then individually assigned the month's name as a string and assigned levels in order for the graph to present the months in the correct order. The graph is then plotted using ggplot.
 
 ```{r}
-grouped_data <- grouped_data %>%
+grouped_DED_med <- grouped_DED_med %>%
   mutate(
-    month = paid_date_month %% 100,  # Extract month part from YYYYMM
+    month = paid_date_month %% 100,
     month_name = case_when(
       month == 1  ~ "January",
       month == 2  ~ "February",
@@ -71,14 +65,10 @@ grouped_data <- grouped_data %>%
       month == 9  ~ "September",
       month == 10 ~ "October",
       month == 11 ~ "November",
-      month == 12 ~ "December"
-    ),
+      month == 12 ~ "December"),
+      month_name = factor(month_name, levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"))
 
-    month_name = factor(month_name, levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"))
-  )
-
-# Plotting with both points and lines
-ggplot(grouped_data, aes(x = month_name, y = total_paid_quantity)) +
+ggplot(grouped_DED_med, aes(x = month_name, y = total_paid_quantity)) +
   geom_line(group = 1) + 
   geom_point() +
   labs(
@@ -88,10 +78,9 @@ ggplot(grouped_data, aes(x = month_name, y = total_paid_quantity)) +
   )
 ```
 
-Moving forward I would like to find ways to be more keywords to detect DED medications.
-
-I would like to include data from several years instead of just 2024.
-
-Then, I would like to look specifically at the seasons and see if there are links to other conditions through medication such as allergy medications that may be causing dry eyes.
-
-Additionally looking at the link to geographical location through health-boards could be interesting, and looking deeper into the links with air quality in cities vs more rural towns as well as trends in different climates and humidities across Scotland's healthboards.
+-Moving forward 
+Include data from several years instead of just 2024. 
+More analysis into the seasonal variations.
+Look at links of usage of allergy medicine (e.g. antihistamines) and DED medication, to determine allergy's impact.
+Looking into the link of cities vs more rural towns on DED medication usage, which furthermore could look at air quality.
+Looking at the impact of different climates and humidities in Scotland on DED.
