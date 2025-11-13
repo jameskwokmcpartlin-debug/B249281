@@ -4,7 +4,7 @@ output: html_document
 date: "2025-11-12"
 ---
 
-This project aims to look at trends in the prescribing of dry eye disease (DED) medication across the year.
+This project aims to look at trends in the prescribing of dry eye disease (DED) medication across different seasons in Scotland.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -82,16 +82,16 @@ ggplot(grouped_data, aes(x = month_name, y = total_paid_quantity)) +
   geom_line(group = 1) + 
   geom_point() +
   labs(
-    title = "Paid Quantity of Dry Eye Disease Medication over each Month",
+    title = "Paid Quantity of Dry Eye Disease Medication over each Month in 2024",
     x = "Month",
     y = "Total Paid Quantity"
   )
 ```
 
-Moving forward, I would like to include data from several years instead of just 2024.
+Moving forward I would like to find ways to be more keywords to detect DED medications.
 
-Then, I would like to look specifically at the seasons and see if there are links to other medications such as allergy medications that may be causing dry eyes.
+I would like to include data from several years instead of just 2024.
 
-Additionally looking at geographical location through health-boards as well as age's impact on usage of dry eye medication.
+Then, I would like to look specifically at the seasons and see if there are links to other conditions through medication such as allergy medications that may be causing dry eyes.
 
-Seasonal weather and air quality?
+Additionally looking at the link to geographical location through health-boards could be interesting, and looking deeper into the links with air quality in cities vs more rural towns as well as trends in different climates and humidities across Scotland's healthboards.
