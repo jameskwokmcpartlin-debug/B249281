@@ -88,6 +88,12 @@ ggplot(grouped_DED_med, aes(x = month_name, y = total_paid_quantity, group = 1, 
     )
 ```
 
+This graph shows an interesting variation across each month, with the peaks in each respective season being January (Winter), May (Spring), August (Summer), and October (Autumn). Notably, as the year moves from winter to autumn, the respective peaks decrease over the year.
+
+Potentially, the results could follow this pattern:
+
+Prescriptions peak in January as it is in the middle of winter where there is cold, dry air. Prescriptions begin to lower as it warms. Once it reaches May, there is another peak as spring allergies begin. Prescriptions begin to lower again until July/August as summer begins, where temperatures rise and individuals are more prone to go outdoors, which could expose the eyes to more irritation. As it cools again and reaches Autumn, the prescriptions decrease.
+
 -Moving forward
 
 More analysis into the seasonal variations.
