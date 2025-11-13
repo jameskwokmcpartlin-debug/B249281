@@ -4,7 +4,7 @@ output: html_document
 date: "2025-11-12"
 ---
 
-This project aims to look at "trends in the prescribing of dry eye disease medication across different seasons in Scotland."
+This project aims to look at "trends in the prescribing of dry eye disease medication across the four seasons in Scotland."
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -53,6 +53,7 @@ The months are originally given in an unpresentable form as "2024XX", which is u
 grouped_DED_med <- grouped_DED_med %>%
   mutate(
     month = paid_date_month %% 100,
+    
     month_name = case_when(
       month == 1  ~ "January",
       month == 2  ~ "February",
@@ -66,21 +67,35 @@ grouped_DED_med <- grouped_DED_med %>%
       month == 10 ~ "October",
       month == 11 ~ "November",
       month == 12 ~ "December"),
-      month_name = factor(month_name, levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"))
+    
+    month_name = factor(month_name, levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")),
 
-ggplot(grouped_DED_med, aes(x = month_name, y = total_paid_quantity)) +
-  geom_line(group = 1) + 
+    season = case_when(
+      month %in% c(3, 4, 5)  ~ "Spring",
+      month %in% c(6, 7, 8)  ~ "Summer",
+      month %in% c(9, 10, 11) ~ "Autumn",
+      month %in% c(12, 1, 2) ~ "Winter"))
+
+ggplot(grouped_DED_med, aes(x = month_name, y = total_paid_quantity, group = 1, color = season)) +
+  geom_line() + 
   geom_point() +
+  scale_color_manual(values = c("Spring" = "green", "Summer" = "orange", "Autumn" = "brown", "Winter" = "blue")) +
   labs(
-    title = "Paid Quantity of Dry Eye Disease Medication over each Month in 2024",
+    title = "Paid Quantity of Dry Eye Disease Medication over Each Month in 2024",
     x = "Month",
-    y = "Total Paid Quantity"
-  )
+    y = "Total Paid Quantity",
+    color = "Season"
+    )
 ```
 
 -Moving forward 
-Include data from several years instead of just 2024. 
+
 More analysis into the seasonal variations.
+
+Include data from several years instead of just 2024. 
+
 Look at links of usage of allergy medicine (e.g. antihistamines) and DED medication, to determine allergy's impact.
+
 Looking into the link of cities vs more rural towns on DED medication usage, which furthermore could look at air quality.
+
 Looking at the impact of different climates and humidities in Scotland on DED.
