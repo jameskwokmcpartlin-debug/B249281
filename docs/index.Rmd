@@ -32,14 +32,14 @@ dbb_2024 <- dbb_2024 %>%
   clean_names()
 ```
 
-Next, looking at the BNF Code Information - Current - October 2025 Version 88, available through this link: <https://opendata.nhsbsa.net/dataset/bnf-code-information-current-year/resource/0a2aa4d6-f4af-4adb-9c0a-ac5bc5490b23?filters=>, it is possible to filter for BNF_CHAPTER "Eye", then further filter for BNF_SUBPARAGRAPH "Tear deficiency, eye lubricant/astringent", which then reveals that the BNF item code for DED medication begins with the digits 110801, which can be used to specifically identify dry eye disease (DED) medication in the dataframe that represents total prescriptions in 2024.
+Next, looking at the BNF Code Information - Current - October 2025 Version 88, available through this link: <https://opendata.nhsbsa.net/dataset/bnf-code-information-current-year/resource/0a2aa4d6-f4af-4adb-9c0a-ac5bc5490b23?filters=>, it is possible to filter for BNF_CHAPTER "Eye", then further filter for BNF_SUBPARAGRAPH "Tear deficiency, eye lubricant/astringent", which then reveals that the BNF item code for dry eye disease (DED) medication begins with the digits 110801, which can be used to specifically identify DED medication in the dataframe that represents total prescriptions in 2024.
 
 ```{r}
 DED_med_dbb_2024 <- dbb_2024 %>%
   filter(grepl("110801", bnf_item_code))
 ```
 
-This dataframe that has identified the DED medications can then be grouped by month then summed to find the total quantity of prescriptions of DED medication for each month.
+This dataframe that has been filtered for the DED medications can then be grouped by month then summed to find the total paid quantity of prescriptions of DED medication for each month.
 
 ```{r}
 grouped_DED_med <- DED_med_dbb_2024 %>%
@@ -47,7 +47,7 @@ grouped_DED_med <- DED_med_dbb_2024 %>%
     summarise(total_paid_quantity = sum(paid_quantity))
 ```
 
-The months are originally given in an unpresentable form as "2024XX", which is unsuitable for a plot, so a new column is added with the corresponding last numbers, and they are then individually assigned the month's name as a string and assigned levels in order for the graph to present the months in the correct order. The graph is then plotted using ggplot.
+The months are originally given in an unpresentable form as "2024XX", which is unsuitable for a plot, so a new column is added with the corresponding last numbers, and they are then individually assigned the month's name as a string, assigned levels in order for the graph to present the months in the correct order, and given the corresponding season. The graph is then plotted using ggplot, using the month as the X axis, the total paid quantity as Y, and the color as the season in order to visualise each of the four seasons.
 
 ```{r}
 grouped_DED_med <- grouped_DED_med %>%
@@ -88,11 +88,11 @@ ggplot(grouped_DED_med, aes(x = month_name, y = total_paid_quantity, group = 1, 
     )
 ```
 
--Moving forward 
+-Moving forward
 
 More analysis into the seasonal variations.
 
-Include data from several years instead of just 2024. 
+Include data from several years instead of just 2024.
 
 Look at links of usage of allergy medicine (e.g. antihistamines) and DED medication, to determine allergy's impact.
 

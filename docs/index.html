@@ -394,24 +394,26 @@ dbb_2024 &lt;- dbb_2024 %&gt;%
 Version 88, available through this link: <a href="https://opendata.nhsbsa.net/dataset/bnf-code-information-current-year/resource/0a2aa4d6-f4af-4adb-9c0a-ac5bc5490b23?filters=" class="uri">https://opendata.nhsbsa.net/dataset/bnf-code-information-current-year/resource/0a2aa4d6-f4af-4adb-9c0a-ac5bc5490b23?filters=</a>,
 it is possible to filter for BNF_CHAPTER “Eye”, then further filter for
 BNF_SUBPARAGRAPH “Tear deficiency, eye lubricant/astringent”, which then
-reveals that the BNF item code for DED medication begins with the digits
-110801, which can be used to specifically identify dry eye disease (DED)
-medication in the dataframe that represents total prescriptions in
-2024.</p>
+reveals that the BNF item code for dry eye disease (DED) medication
+begins with the digits 110801, which can be used to specifically
+identify DED medication in the dataframe that represents total
+prescriptions in 2024.</p>
 <pre class="r"><code>DED_med_dbb_2024 &lt;- dbb_2024 %&gt;%
   filter(grepl(&quot;110801&quot;, bnf_item_code))</code></pre>
-<p>This dataframe that has identified the DED medications can then be
-grouped by month then summed to find the total quantity of prescriptions
-of DED medication for each month.</p>
+<p>This dataframe that has been filtered for the DED medications can
+then be grouped by month then summed to find the total paid quantity of
+prescriptions of DED medication for each month.</p>
 <pre class="r"><code>grouped_DED_med &lt;- DED_med_dbb_2024 %&gt;%
   group_by(paid_date_month) %&gt;%
     summarise(total_paid_quantity = sum(paid_quantity))</code></pre>
 <p>The months are originally given in an unpresentable form as “2024XX”,
 which is unsuitable for a plot, so a new column is added with the
 corresponding last numbers, and they are then individually assigned the
-month’s name as a string and assigned levels in order for the graph to
-present the months in the correct order. The graph is then plotted using
-ggplot.</p>
+month’s name as a string, assigned levels in order for the graph to
+present the months in the correct order, and given the corresponding
+season. The graph is then plotted using ggplot, using the month as the X
+axis, the total paid quantity as Y, and the color as the season in order
+to visualise each of the four seasons.</p>
 <pre class="r"><code>grouped_DED_med &lt;- grouped_DED_med %&gt;%
   mutate(
     month = paid_date_month %% 100,
