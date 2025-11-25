@@ -4,66 +4,93 @@ output: html_document
 date: "2025-11-12"
 ---
 
-This project aims to look at "trends in the prescribing of dry eye disease medication across the four seasons in Scotland."
+This project aims to look at trends in the prescribing of dry eye disease medication in Scotland by seasons, rurality, sex, and age.
 
 Introduction-
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-  echo = TRUE,
-  message = FALSE,
-  warning = FALSE,
-  fig.show = "hold"
-)
-knitr::opts_knit$set(root.dir = "/Users/james/B249281")
-```
+Dry eye is a condition of various aetiologies which causes ocular surface inflammation and corneal and conjunctival epithelial cell damage [1], [2], [3]. Symptoms include irritation, grittiness, burning, soreness, watery eyes and visual disturbances potentially affecting one or both eyes (Bilkhu).
+
+Dry eye is initiated through mechanisms of tear film hyper-osmolarity and tear film instability [1] and can be broadly divided in to two types, aqueous deficiency and evaporative dry eye. (Bilkhu)
+
+Global DED prevalence is estimated to range from 5% to 50%,2 with estimates in Europe ranging from 10% to 30% (Hossain).
+
+However, it is expected that the number of dry eye patients encountered in UK clinical practice may increase with an aging population. (Bilkhu)
+
+Prevalence of DED in the UK is higher in women compared with men and increases with age, with the majority of individuals with DED aged \>50 years (Hossain).
+
+DED is a major cause for prescribing in primary medical care in the National Health Service in England. In 2014, over 6.4 million prescription items for DED (ie, artificial tears, ocular lubricants and astringents) were dispensed in the community at a cost of more than £27 million to the National Health Service (Hossain).
+
+In a systematic literature search supplemented with information from interviews of ophthalmologists, the annual healthcare costs for 1000 patients with DED who were managed by ophthalmologists in the UK were estimated to be US\$1.10 million (2003/2004 prices), with almost one-half of the total attributed to prescription drug costs. Some patients suffering from DED self-treat their symptoms with over-the-counter artificial tears or are treated by general practitioners/optometrists/pharmacists; thus, annual costs could be higher as only reimbursed treatments prescribed by ophthalmologists were captured in this estimate (Hossain).
 
 ```{r}
+ # Load required packages
 library(tidyverse)
 library(janitor)
 library(gt)
 library(scales)
+library(here)
 ```
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, # Show R code in output
+  message = FALSE, # Prevent package messages
+  warning = FALSE) # Prevent warning messages
+
+knitr::opts_knit$set(root.dir = here()) # Set root directory to be here() so code is reproducable for any user
+```
+
+# Sourcing the raw data
+
+The files are downloaded from the Prescriptions in the Community page from Public Health Scotland. The data selected and downloaded are the Data by Prescriber Location from January 2022 to Decemeber 2024, in order to show more comprehensive data over several years. They are then put into the prescribing_data subfolder within the data folder.
+
+In order to determine which prescriptions are related to DED, the BNF Code Information (accessible here: <https://opendata.nhsbsa.net/dataset/bnf-code-information-current-year>) can be used to filter for Tear deficiency, eye lubricant and astringent within BNF_PARAGRAPH. From this, it can be determined that these DED medications' BNFItemCode in prescribing_data begin with '110801'.
+
 ```{r}
+# Here the data is loaded programatically instead of manually which keeps the coding more DRY and makes it easier for future months to be added and analysed.
+
 prescribing_data <- list.files("data/prescribing_data", full.names = TRUE) %>% 
   set_names() %>%
   map(~ read_csv(.x) %>%
-        rename(any_of(c(HBT = "HBT2014"))) %>%
-        select(HBT, BNFItemCode, BNFItemDescription, GPPractice, NumberOfPaidItems, PaidQuantity, GrossIngredientCost, PaidDateMonth))
+  rename(any_of(c(HBT = "HBT2014"))) %>% # Some of the Data by Prescriber Location files' column for their healthboard is named HBT2014 which means they must be renamed in order to be later combined into a single dataframe.
+  select(HBT, BNFItemCode, BNFItemDescription, GPPractice, NumberOfPaidItems, PaidQuantity, GrossIngredientCost, PaidDateMonth)) # Selecting only the columns relevant to the study and for cleaner data.
 
 ded_prescriptions <- prescribing_data %>%
-  map(~ .x %>% filter(grepl("110801", BNFItemCode))) %>%
+  map(~ .x %>% filter(grepl("110801", BNFItemCode))) %>% # This allows to filter only for the DED prescriptions, which BNFItemCode begins with 110801.
   bind_rows() %>%
   clean_names()
 ```
 
+# Seasonal Variation
+
+It has been shown that patients who participate in over four hours of outdoor activity on a weekend day are 2.4 times more likely to experience DED. This is likely due to a variety of factors related to the environmental impact of the outdoors, such as, temperature, humidity, wind, precipitation, sunlight exposure, and air pollution. Moreover, it has been shown that any allergy, which often are exacerbated seasonally, are significant risk factors of DED (vidal-rohr). This raises the question of if, and how seasonality and climate can affect the prescriptions of DED medication, and can be useful data for clinicians and pharmacists to predict variations in the amount of medication they may have to prescribe over the year.
+
+The DED prescriptions data includes information on which month and year it was prescribed, which can be used to be stratified into each month. By grouping by month, it can be determined how many items were prescribed (the column of paid_quantity) in each month. Furthermore, these months can be assigned into the four seasons which allow for a clean final visualisation. Finally, using a trend line via geom_smooth() allows for the overall trend to be observed.
+
 ```{r}
 ded_seasonal_summary <- ded_prescriptions %>%
   mutate(month = paid_date_month %% 100, month_name = case_when(
-      month == 1  ~ "January",
-      month == 2  ~ "February",
-      month == 3  ~ "March",
-      month == 4  ~ "April",
-      month == 5  ~ "May",
-      month == 6  ~ "June",
-      month == 7  ~ "July",
-      month == 8  ~ "August",
-      month == 9  ~ "September",
-      month == 10 ~ "October",
-      month == 11 ~ "November",
-      month == 12 ~ "December")) %>%
+    month == 1  ~ "January",
+    month == 2  ~ "February",
+    month == 3  ~ "March",
+    month == 4  ~ "April",
+    month == 5  ~ "May",
+    month == 6  ~ "June",
+    month == 7  ~ "July",
+    month == 8  ~ "August",
+    month == 9  ~ "September",
+    month == 10 ~ "October",
+    month == 11 ~ "November",
+    month == 12 ~ "December")) %>%
   group_by(month_name, month) %>%
     summarise(total_paid_quantity = sum(paid_quantity)) %>%
   mutate(month_name = factor(month_name, levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")),
-    season = case_when(
-      month %in% c(3, 4, 5)  ~ "Spring",
-      month %in% c(6, 7, 8)  ~ "Summer",
-      month %in% c(9, 10, 11) ~ "Autumn",
-      month %in% c(12, 1, 2) ~ "Winter"))
-```
+         season = case_when(
+           month %in% c(3, 4, 5)  ~ "Spring",
+           month %in% c(6, 7, 8)  ~ "Summer",
+           month %in% c(9, 10, 11) ~ "Autumn",
+           month %in% c(12, 1, 2) ~ "Winter"))
 
-```{r}
 ggplot(ded_seasonal_summary, aes(x = month_name, y = total_paid_quantity, group = 1, color = season)) +
   geom_line(size = 1.2) + 
   geom_point(size = 2) +
@@ -82,6 +109,16 @@ ggplot(ded_seasonal_summary, aes(x = month_name, y = total_paid_quantity, group 
   geom_smooth(aes(group = 1), method = "loess", se = FALSE, linetype = "dashed", color = "black")
 ```
 
+It can be hypothesised that during the winter months there could be a peak due to the colder, dryer air, however, patients may be less inclined to be outdoors for prolonged periods of time. During the spring months when allergies begin to spike, not only could the allergies worsen symptoms, but patients could begin spending more time outdoors. Moving into summer, patients will likely be spending the most time exposed to the outdoors, with the most sunlight exposure and warmest weather. Finally in Autumn, there will be less time spent outdoors as temperatures drop again.
+
+Of course there are limitations in what can be observed from this graph and it is difficult to truly draw conclusions on why this seasonal variation is happening. There are geographical variations across Scotland geographically, with regions experiencing different climates and exposures which is difficult to determine from this data. Further research into seasonal behavioural trends related to outdoor exposure and DED in Scotland could reveal interesting patterns to better explain these variations.
+
+# Rurality
+
+To try and answer this question of how geographical variations in Scotland can affect DED, examining further than just seasonality can be particularly useful. It is established that air pollution and outdoor exposure are risk factors of DED (vidal-rohr), and whether a patient lives in a rural or urban setting could have significant implications on their exposures to these risk factors, and therefore, whether they develop it. It is key for prescribers to understand the demographics of different geographical areas as trends seen in patients could largely vary across Scotland.
+
+The 2 raw data are sourced from Public Health Scotland from GP Practice List Page January 2025 (in order to ensure all practices are included in 2024.) and the Urban Rural 2020 Fold, which are then joined together.
+
 ```{r}
 gp_details <- read_csv("data/gp_details/0d2e258a-1451-4af1-a7e5-e8327994fa55.csv") %>%
   select(PracticeCode, DataZone, PracticeListSize) %>%
@@ -94,6 +131,8 @@ urban_rural <- read_csv("data/urban_rural/c8bd76cd-6613-4dd7-8a28-6c99a16dc678.c
 gp_rurality <- inner_join(gp_details, urban_rural, by = "data_zone")
 ```
 
+From the DED prescriptions data, the prescriptions are stratified by GP Practice to determine the total number of DED items prescribed by each practice. This can then be joined with the GP and rurality data to determine the number of DED prescriptions in each GP practice and what fold their rurality is in the Urban Rural 6 Fold 2020. Finally, once stratified by Urban Rural Fold, the practice population of each fold, how many DED items were prescribed, and the number of items prescribed per person can be determined and visually displayed as a table.
+
 ```{r}
 ded_prescriptions_by_gp <- ded_prescriptions %>%
   group_by(gp_practice) %>%
@@ -103,12 +142,9 @@ ded_prescriptions_rurality <- full_join(ded_prescriptions_by_gp, gp_rurality, by
   filter(!is.na(urban_rural6fold2020)) %>%
   group_by(urban_rural6fold2020) %>%
   summarise(total_paid_quantity = sum(total_paid_quantity, na.rm = TRUE), total_practice_list_size = sum(practice_list_size, na.rm = TRUE)) %>%
-  mutate(proportion_quantity = total_paid_quantity / total_practice_list_size, urban_rural6fold2020 = factor(urban_rural6fold2020, levels = 1:6, labels = c("Large Urban Areas [1]", "Other Urban Areas [2]", "Accessible Small Towns [3]", "Remote Small Towns [4]", "Accessible Rural [5]", "Remote Rural [6]")))
-```
+  mutate(proportion_quantity = total_paid_quantity / total_practice_list_size, itemsperperson = total_paid_quantity / total_practice_list_size, urban_rural6fold2020 = factor(urban_rural6fold2020, levels = 1:6, labels = c("Large Urban Areas [1]", "Other Urban Areas [2]", "Accessible Small Towns [3]", "Remote Small Towns [4]", "Accessible Rural [5]", "Remote Rural [6]")))
 
-```{r}
 ded_prescriptions_rurality %>%
-  mutate(itemsperperson = total_paid_quantity / total_practice_list_size) %>%
   select(urbanrural = urban_rural6fold2020, total_items = total_paid_quantity, total_population = total_practice_list_size, itemsperperson) %>%
   gt() %>%
   tab_header(
@@ -123,7 +159,7 @@ ded_prescriptions_rurality %>%
     decimals = 3) %>%
   cols_label(
     urbanrural = "Urban/Rural Category",
-    total_items = "Total DED Items Dispensed",
+    total_items = "Total DED Items Prescribed",
     total_population = "Total Practice Population",
     itemsperperson = "Items per Person") %>%
   tab_style(
@@ -162,7 +198,7 @@ sex_population <- practice_populations %>%
 ded_per_sex_gp_2024 <- inner_join(ded_by_gp_2024, sex_population, by = c("gp_practice" = "practice_code")) %>%
   mutate(rate_per_person = total_paid_quantity / All)
 ```
-  
+
 ```{r}
 ggplot(ded_per_sex_gp_2024, aes(x = female_to_male_ratio, y = rate_per_person, size = All)) +
   geom_point(color = "pink1", alpha = 0.7) +
@@ -218,5 +254,3 @@ ggplot(joined_hbt_DED, aes(x = weighted_age, y = rate_per_person, size = all_age
     legend.position = "bottom"
   )
 ```
-
-

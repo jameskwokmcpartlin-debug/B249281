@@ -355,18 +355,52 @@ display: none;
 </div>
 
 
-<p>This project aims to look at “trends in the prescribing of dry eye
-disease medication across the four seasons in Scotland.”</p>
+<p>This project aims to look at trends in the prescribing of dry eye
+disease medication in Scotland by seasons, rurality, sex, and age.</p>
 <p>Introduction-</p>
-<pre class="r"><code>library(tidyverse)
+<p>Dry eye is a condition of various aetiologies which causes ocular
+surface inflammation and corneal and conjunctival epithelial cell damage
+[1], [2], [3]. Symptoms include irritation, grittiness, burning,
+soreness, watery eyes and visual disturbances potentially affecting one
+or both eyes (Bilkhu).</p>
+<p>Dry eye is initiated through mechanisms of tear film hyper-osmolarity
+and tear film instability [1] and can be broadly divided in to two
+types, aqueous deficiency and evaporative dry eye. (Bilkhu)</p>
+<p>Global DED prevalence is estimated to range from 5% to 50%,2 with
+estimates in Europe ranging from 10% to 30% (Hossain).</p>
+<p>However, it is expected that the number of dry eye patients
+encountered in UK clinical practice may increase with an aging
+population. (Bilkhu)</p>
+<p>Prevalence of DED in the UK is higher in women compared with men and
+increases with age, with the majority of individuals with DED aged
+&gt;50 years (Hossain).</p>
+<p>DED is a major cause for prescribing in primary medical care in the
+National Health Service in England. In 2014, over 6.4 million
+prescription items for DED (ie, artificial tears, ocular lubricants and
+astringents) were dispensed in the community at a cost of more than
+£27 million to the National Health Service (Hossain).</p>
+<p>In a systematic literature search supplemented with information from
+interviews of ophthalmologists, the annual healthcare costs for 1000
+patients with DED who were managed by ophthalmologists in the UK were
+estimated to be US$1.10 million (2003/2004 prices), with almost one-half
+of the total attributed to prescription drug costs. Some patients
+suffering from DED self-treat their symptoms with over-the-counter
+artificial tears or are treated by general
+practitioners/optometrists/pharmacists; thus, annual costs could be
+higher as only reimbursed treatments prescribed by ophthalmologists were
+captured in this estimate (Hossain).</p>
+<p>Results</p>
+<pre class="r"><code> # Load required packages
+library(tidyverse)
 library(janitor)
 library(gt)
 library(scales)</code></pre>
-<pre class="r"><code>prescribing_data &lt;- list.files(&quot;data/prescribing_data&quot;, full.names = TRUE) %&gt;% 
-  set_names() %&gt;%
+<pre class="r"><code># Get a list of all prescribing data files
+prescribing_data &lt;- list.files(&quot;data/prescribing_data&quot;, full.names = TRUE) %&gt;% 
+  set_names() %&gt;% # Use file 
   map(~ read_csv(.x) %&gt;%
-        rename(any_of(c(HBT = &quot;HBT2014&quot;))) %&gt;%
-        select(HBT, BNFItemCode, BNFItemDescription, GPPractice, NumberOfPaidItems, PaidQuantity, GrossIngredientCost, PaidDateMonth))
+  rename(any_of(c(HBT = &quot;HBT2014&quot;))) %&gt;%
+  select(HBT, BNFItemCode, BNFItemDescription, GPPractice, NumberOfPaidItems, PaidQuantity, GrossIngredientCost, PaidDateMonth))
 
 ded_prescriptions &lt;- prescribing_data %&gt;%
   map(~ .x %&gt;% filter(grepl(&quot;110801&quot;, BNFItemCode))) %&gt;%
@@ -374,26 +408,26 @@ ded_prescriptions &lt;- prescribing_data %&gt;%
   clean_names()</code></pre>
 <pre class="r"><code>ded_seasonal_summary &lt;- ded_prescriptions %&gt;%
   mutate(month = paid_date_month %% 100, month_name = case_when(
-      month == 1  ~ &quot;January&quot;,
-      month == 2  ~ &quot;February&quot;,
-      month == 3  ~ &quot;March&quot;,
-      month == 4  ~ &quot;April&quot;,
-      month == 5  ~ &quot;May&quot;,
-      month == 6  ~ &quot;June&quot;,
-      month == 7  ~ &quot;July&quot;,
-      month == 8  ~ &quot;August&quot;,
-      month == 9  ~ &quot;September&quot;,
-      month == 10 ~ &quot;October&quot;,
-      month == 11 ~ &quot;November&quot;,
-      month == 12 ~ &quot;December&quot;)) %&gt;%
+    month == 1  ~ &quot;January&quot;,
+    month == 2  ~ &quot;February&quot;,
+    month == 3  ~ &quot;March&quot;,
+    month == 4  ~ &quot;April&quot;,
+    month == 5  ~ &quot;May&quot;,
+    month == 6  ~ &quot;June&quot;,
+    month == 7  ~ &quot;July&quot;,
+    month == 8  ~ &quot;August&quot;,
+    month == 9  ~ &quot;September&quot;,
+    month == 10 ~ &quot;October&quot;,
+    month == 11 ~ &quot;November&quot;,
+    month == 12 ~ &quot;December&quot;)) %&gt;%
   group_by(month_name, month) %&gt;%
     summarise(total_paid_quantity = sum(paid_quantity)) %&gt;%
   mutate(month_name = factor(month_name, levels = c(&quot;January&quot;, &quot;February&quot;, &quot;March&quot;, &quot;April&quot;, &quot;May&quot;, &quot;June&quot;, &quot;July&quot;, &quot;August&quot;, &quot;September&quot;, &quot;October&quot;, &quot;November&quot;, &quot;December&quot;)),
-    season = case_when(
-      month %in% c(3, 4, 5)  ~ &quot;Spring&quot;,
-      month %in% c(6, 7, 8)  ~ &quot;Summer&quot;,
-      month %in% c(9, 10, 11) ~ &quot;Autumn&quot;,
-      month %in% c(12, 1, 2) ~ &quot;Winter&quot;))</code></pre>
+         season = case_when(
+           month %in% c(3, 4, 5)  ~ &quot;Spring&quot;,
+           month %in% c(6, 7, 8)  ~ &quot;Summer&quot;,
+           month %in% c(9, 10, 11) ~ &quot;Autumn&quot;,
+           month %in% c(12, 1, 2) ~ &quot;Winter&quot;))</code></pre>
 <pre class="r"><code>ggplot(ded_seasonal_summary, aes(x = month_name, y = total_paid_quantity, group = 1, color = season)) +
   geom_line(size = 1.2) + 
   geom_point(size = 2) +
@@ -461,20 +495,20 @@ ded_prescriptions_rurality &lt;- full_join(ded_prescriptions_by_gp, gp_rurality,
     table.border.bottom.color = &quot;white&quot;,
     heading.title.font.size = 20,
     heading.subtitle.font.size = 14)</code></pre>
-<div id="lzslcuaatt" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
-<style>#lzslcuaatt table {
+<div id="spwdeejygv" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#spwdeejygv table {
 font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 -webkit-font-smoothing: antialiased;
 -moz-osx-font-smoothing: grayscale;
 }
-#lzslcuaatt thead, #lzslcuaatt tbody, #lzslcuaatt tfoot, #lzslcuaatt tr, #lzslcuaatt td, #lzslcuaatt th {
+#spwdeejygv thead, #spwdeejygv tbody, #spwdeejygv tfoot, #spwdeejygv tr, #spwdeejygv td, #spwdeejygv th {
 border-style: none;
 }
-#lzslcuaatt p {
+#spwdeejygv p {
 margin: 0;
 padding: 0;
 }
-#lzslcuaatt .gt_table {
+#spwdeejygv .gt_table {
 display: table;
 border-collapse: collapse;
 line-height: normal;
@@ -499,11 +533,11 @@ border-left-style: none;
 border-left-width: 2px;
 border-left-color: #D3D3D3;
 }
-#lzslcuaatt .gt_caption {
+#spwdeejygv .gt_caption {
 padding-top: 4px;
 padding-bottom: 4px;
 }
-#lzslcuaatt .gt_title {
+#spwdeejygv .gt_title {
 color: #333333;
 font-size: 20px;
 font-weight: initial;
@@ -514,7 +548,7 @@ padding-right: 5px;
 border-bottom-color: #FFFFFF;
 border-bottom-width: 0;
 }
-#lzslcuaatt .gt_subtitle {
+#spwdeejygv .gt_subtitle {
 color: #333333;
 font-size: 14px;
 font-weight: initial;
@@ -525,7 +559,7 @@ padding-right: 5px;
 border-top-color: #FFFFFF;
 border-top-width: 0;
 }
-#lzslcuaatt .gt_heading {
+#spwdeejygv .gt_heading {
 background-color: #FFFFFF;
 text-align: center;
 border-bottom-color: #FFFFFF;
@@ -536,12 +570,12 @@ border-right-style: none;
 border-right-width: 1px;
 border-right-color: #D3D3D3;
 }
-#lzslcuaatt .gt_bottom_border {
+#spwdeejygv .gt_bottom_border {
 border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 }
-#lzslcuaatt .gt_col_headings {
+#spwdeejygv .gt_col_headings {
 border-top-style: solid;
 border-top-width: 2px;
 border-top-color: #D3D3D3;
@@ -555,7 +589,7 @@ border-right-style: none;
 border-right-width: 1px;
 border-right-color: #D3D3D3;
 }
-#lzslcuaatt .gt_col_heading {
+#spwdeejygv .gt_col_heading {
 color: #333333;
 background-color: #F0F0F0;
 font-size: 100%;
@@ -574,7 +608,7 @@ padding-left: 5px;
 padding-right: 5px;
 overflow-x: hidden;
 }
-#lzslcuaatt .gt_column_spanner_outer {
+#spwdeejygv .gt_column_spanner_outer {
 color: #333333;
 background-color: #F0F0F0;
 font-size: 100%;
@@ -585,13 +619,13 @@ padding-bottom: 0;
 padding-left: 4px;
 padding-right: 4px;
 }
-#lzslcuaatt .gt_column_spanner_outer:first-child {
+#spwdeejygv .gt_column_spanner_outer:first-child {
 padding-left: 0;
 }
-#lzslcuaatt .gt_column_spanner_outer:last-child {
+#spwdeejygv .gt_column_spanner_outer:last-child {
 padding-right: 0;
 }
-#lzslcuaatt .gt_column_spanner {
+#spwdeejygv .gt_column_spanner {
 border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
@@ -602,10 +636,10 @@ overflow-x: hidden;
 display: inline-block;
 width: 100%;
 }
-#lzslcuaatt .gt_spanner_row {
+#spwdeejygv .gt_spanner_row {
 border-bottom-style: hidden;
 }
-#lzslcuaatt .gt_group_heading {
+#spwdeejygv .gt_group_heading {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -630,7 +664,7 @@ border-right-color: #D3D3D3;
 vertical-align: middle;
 text-align: left;
 }
-#lzslcuaatt .gt_empty_group_heading {
+#spwdeejygv .gt_empty_group_heading {
 padding: 0.5px;
 color: #333333;
 background-color: #FFFFFF;
@@ -644,13 +678,13 @@ border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 vertical-align: middle;
 }
-#lzslcuaatt .gt_from_md > :first-child {
+#spwdeejygv .gt_from_md > :first-child {
 margin-top: 0;
 }
-#lzslcuaatt .gt_from_md > :last-child {
+#spwdeejygv .gt_from_md > :last-child {
 margin-bottom: 0;
 }
-#lzslcuaatt .gt_row {
+#spwdeejygv .gt_row {
 padding-top: 6px;
 padding-bottom: 6px;
 padding-left: 5px;
@@ -668,7 +702,7 @@ border-right-color: #D3D3D3;
 vertical-align: middle;
 overflow-x: hidden;
 }
-#lzslcuaatt .gt_stub {
+#spwdeejygv .gt_stub {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -680,7 +714,7 @@ border-right-color: #D3D3D3;
 padding-left: 5px;
 padding-right: 5px;
 }
-#lzslcuaatt .gt_stub_row_group {
+#spwdeejygv .gt_stub_row_group {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -693,13 +727,13 @@ padding-left: 5px;
 padding-right: 5px;
 vertical-align: top;
 }
-#lzslcuaatt .gt_row_group_first td {
+#spwdeejygv .gt_row_group_first td {
 border-top-width: 2px;
 }
-#lzslcuaatt .gt_row_group_first th {
+#spwdeejygv .gt_row_group_first th {
 border-top-width: 2px;
 }
-#lzslcuaatt .gt_summary_row {
+#spwdeejygv .gt_summary_row {
 color: #333333;
 background-color: #FFFFFF;
 text-transform: inherit;
@@ -708,14 +742,14 @@ padding-bottom: 8px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#lzslcuaatt .gt_first_summary_row {
+#spwdeejygv .gt_first_summary_row {
 border-top-style: solid;
 border-top-color: #D3D3D3;
 }
-#lzslcuaatt .gt_first_summary_row.thick {
+#spwdeejygv .gt_first_summary_row.thick {
 border-top-width: 2px;
 }
-#lzslcuaatt .gt_last_summary_row {
+#spwdeejygv .gt_last_summary_row {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -724,7 +758,7 @@ border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 }
-#lzslcuaatt .gt_grand_summary_row {
+#spwdeejygv .gt_grand_summary_row {
 color: #333333;
 background-color: #FFFFFF;
 text-transform: inherit;
@@ -733,7 +767,7 @@ padding-bottom: 8px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#lzslcuaatt .gt_first_grand_summary_row {
+#spwdeejygv .gt_first_grand_summary_row {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -742,7 +776,7 @@ border-top-style: double;
 border-top-width: 6px;
 border-top-color: #D3D3D3;
 }
-#lzslcuaatt .gt_last_grand_summary_row_top {
+#spwdeejygv .gt_last_grand_summary_row_top {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -751,10 +785,10 @@ border-bottom-style: double;
 border-bottom-width: 6px;
 border-bottom-color: #D3D3D3;
 }
-#lzslcuaatt .gt_striped {
+#spwdeejygv .gt_striped {
 background-color: rgba(128, 128, 128, 0.05);
 }
-#lzslcuaatt .gt_table_body {
+#spwdeejygv .gt_table_body {
 border-top-style: solid;
 border-top-width: 2px;
 border-top-color: #D3D3D3;
@@ -762,7 +796,7 @@ border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 }
-#lzslcuaatt .gt_footnotes {
+#spwdeejygv .gt_footnotes {
 color: #333333;
 background-color: #FFFFFF;
 border-bottom-style: none;
@@ -775,7 +809,7 @@ border-right-style: none;
 border-right-width: 2px;
 border-right-color: #D3D3D3;
 }
-#lzslcuaatt .gt_footnote {
+#spwdeejygv .gt_footnote {
 margin: 0px;
 font-size: 90%;
 padding-top: 4px;
@@ -783,7 +817,7 @@ padding-bottom: 4px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#lzslcuaatt .gt_sourcenotes {
+#spwdeejygv .gt_sourcenotes {
 color: #333333;
 background-color: #FFFFFF;
 border-bottom-style: none;
@@ -796,64 +830,64 @@ border-right-style: none;
 border-right-width: 2px;
 border-right-color: #D3D3D3;
 }
-#lzslcuaatt .gt_sourcenote {
+#spwdeejygv .gt_sourcenote {
 font-size: 90%;
 padding-top: 4px;
 padding-bottom: 4px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#lzslcuaatt .gt_left {
+#spwdeejygv .gt_left {
 text-align: left;
 }
-#lzslcuaatt .gt_center {
+#spwdeejygv .gt_center {
 text-align: center;
 }
-#lzslcuaatt .gt_right {
+#spwdeejygv .gt_right {
 text-align: right;
 font-variant-numeric: tabular-nums;
 }
-#lzslcuaatt .gt_font_normal {
+#spwdeejygv .gt_font_normal {
 font-weight: normal;
 }
-#lzslcuaatt .gt_font_bold {
+#spwdeejygv .gt_font_bold {
 font-weight: bold;
 }
-#lzslcuaatt .gt_font_italic {
+#spwdeejygv .gt_font_italic {
 font-style: italic;
 }
-#lzslcuaatt .gt_super {
+#spwdeejygv .gt_super {
 font-size: 65%;
 }
-#lzslcuaatt .gt_footnote_marks {
+#spwdeejygv .gt_footnote_marks {
 font-size: 75%;
 vertical-align: 0.4em;
 position: initial;
 }
-#lzslcuaatt .gt_asterisk {
+#spwdeejygv .gt_asterisk {
 font-size: 100%;
 vertical-align: 0;
 }
-#lzslcuaatt .gt_indent_1 {
+#spwdeejygv .gt_indent_1 {
 text-indent: 5px;
 }
-#lzslcuaatt .gt_indent_2 {
+#spwdeejygv .gt_indent_2 {
 text-indent: 10px;
 }
-#lzslcuaatt .gt_indent_3 {
+#spwdeejygv .gt_indent_3 {
 text-indent: 15px;
 }
-#lzslcuaatt .gt_indent_4 {
+#spwdeejygv .gt_indent_4 {
 text-indent: 20px;
 }
-#lzslcuaatt .gt_indent_5 {
+#spwdeejygv .gt_indent_5 {
 text-indent: 25px;
 }
-#lzslcuaatt .katex-display {
+#spwdeejygv .katex-display {
 display: inline-flex !important;
 margin-bottom: 0.75em !important;
 }
-#lzslcuaatt div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+#spwdeejygv div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
 height: 0px !important;
 }
 </style>
