@@ -6,7 +6,7 @@ date: "2025-11-12"
 
 This project aims to look at trends in the prescribing of dry eye disease medication in Scotland by seasons, rurality, sex, and age.
 
-Introduction-
+# Introduction
 
 Dry eye is a condition of various aetiologies which causes ocular surface inflammation and corneal and conjunctival epithelial cell damage [1], [2], [3]. Symptoms include irritation, grittiness, burning, soreness, watery eyes and visual disturbances potentially affecting one or both eyes (Bilkhu).
 
@@ -20,7 +20,18 @@ Prevalence of DED in the UK is higher in women compared with men and increases w
 
 DED is a major cause for prescribing in primary medical care in the National Health Service in England. In 2014, over 6.4 million prescription items for DED (ie, artificial tears, ocular lubricants and astringents) were dispensed in the community at a cost of more than £27 million to the National Health Service (Hossain).
 
+DED can impact health-related and vision-related quality of life (QoL), with affected patients showing greater functional impairment associated with physical fatigue, pain, depression, total symptom burden and QoL.8 Moreover, patients are more likely to experience problems with reading, television and computer use, driving and performing professional work.9 In addition, DED was associated with approximately 30% impairment in workplace performance, work productivity and non-job-related activities in a prospective cross-sectional study.10 (Hossain)
+
 In a systematic literature search supplemented with information from interviews of ophthalmologists, the annual healthcare costs for 1000 patients with DED who were managed by ophthalmologists in the UK were estimated to be US\$1.10 million (2003/2004 prices), with almost one-half of the total attributed to prescription drug costs. Some patients suffering from DED self-treat their symptoms with over-the-counter artificial tears or are treated by general practitioners/optometrists/pharmacists; thus, annual costs could be higher as only reimbursed treatments prescribed by ophthalmologists were captured in this estimate (Hossain).
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, # Show R code in output
+  message = FALSE, # Prevent package messages
+  warning = FALSE) # Prevent warning messages
+
+knitr::opts_knit$set(root.dir = "/Users/james/B249281") # Set root directory
+```
 
 ```{r}
  # Load required packages
@@ -31,16 +42,9 @@ library(scales)
 library(here)
 ```
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-  echo = TRUE, # Show R code in output
-  message = FALSE, # Prevent package messages
-  warning = FALSE) # Prevent warning messages
+# Results
 
-knitr::opts_knit$set(root.dir = here()) # Set root directory to be here() so code is reproducable for any user
-```
-
-# Sourcing the raw data
+## Sourcing the raw data
 
 The files are downloaded from the Prescriptions in the Community page from Public Health Scotland. The data selected and downloaded are the Data by Prescriber Location from January 2022 to Decemeber 2024, in order to show more comprehensive data over several years. They are then put into the prescribing_data subfolder within the data folder.
 
@@ -61,7 +65,7 @@ ded_prescriptions <- prescribing_data %>%
   clean_names()
 ```
 
-# Seasonal Variation
+## Seasonal Variation
 
 It has been shown that patients who participate in over four hours of outdoor activity on a weekend day are 2.4 times more likely to experience DED. This is likely due to a variety of factors related to the environmental impact of the outdoors, such as, temperature, humidity, wind, precipitation, sunlight exposure, and air pollution. Moreover, it has been shown that any allergy, which often are exacerbated seasonally, are significant risk factors of DED (vidal-rohr). This raises the question of if, and how seasonality and climate can affect the prescriptions of DED medication, and can be useful data for clinicians and pharmacists to predict variations in the amount of medication they may have to prescribe over the year.
 
@@ -113,7 +117,7 @@ It can be hypothesised that during the winter months there could be a peak due t
 
 Of course there are limitations in what can be observed from this graph and it is difficult to truly draw conclusions on why this seasonal variation is happening. There are geographical variations across Scotland geographically, with regions experiencing different climates and exposures which is difficult to determine from this data. Further research into seasonal behavioural trends related to outdoor exposure and DED in Scotland could reveal interesting patterns to better explain these variations.
 
-# Rurality
+## Rurality
 
 To try and answer this question of how geographical variations in Scotland can affect DED, examining further than just seasonality can be particularly useful. It is established that air pollution and outdoor exposure are risk factors of DED (vidal-rohr), and whether a patient lives in a rural or urban setting could have significant implications on their exposures to these risk factors, and therefore, whether they develop it. It is key for prescribers to understand the demographics of different geographical areas as trends seen in patients could largely vary across Scotland.
 
@@ -177,10 +181,22 @@ ded_prescriptions_rurality %>%
     heading.subtitle.font.size = 14)
 ```
 
+The results of the table are interesting, it may have been expected that urban areas may result in greater numbers of prescriptions per person due to air pollution, however the impact of this may be limited due to Scotland having less of a pollution problem than other cities worldwide, meaning the relative difference between urban and rural is not significant enough to impact this. It would also be expected that in urban areas there could potentially be better access to healthcare resources, resulting in greater prescriptions per person, however, this is not observed. The prescriptions per person in smaller towns or rural areas being on average higher than urban areas (3.2 \> 2.7) supports the narrative that outdoor exposure is a significant risk factor for DED as these patients may have better access to outdoor activities resulting in greater time spent exposed outdoors.
+
+## Demographics
+
+While geographical location and climate play key roles in the exposure of significant risk factors, specific demographics have also been shown to play key a role in the prevelance of DED across Scotland. In particular, sex and age (Hossain). It has been shown there are male-specific sex hormones which help regulate both tear lipid and aqueous secretions, as well as the immune responses of corneal and conjunctival cells. Whereas in females, these specific sex hormones antagonise these functions. As a result, females are shown to be 2.4 times more significantly likely to experience DED than males (vidal-rohr). Moreover, the majority of individuals with DED are aged \>50 years (Hossain), and as Scotland has an aging population, the effects of this can be profound.
+
+The data is sourced from the practice populations information from Public Health Scotland.
+
 ```{r}
 practice_populations <- read_csv("data/practice_populations/ce967fa9-0f7f-4389-9f19-4958c45e43c2.csv") %>%
   clean_names()
 ```
+
+### Sex
+
+Using the DED prescription data, it is filtered for only the items prescribed in 2024 in order to better represent the average number of prescriptions per person from the current 2025 January practice data. The practice population is then stratified by sex and GP practice and then transformed from long format to wide format using pivot_wider(). By transforming, the Male and Female sex can become columns and allows for the number of patients of each sex in each GP practice to be compared. A ratio can then be calculated for the female to male ratio in each GP practice, which can be used as the x-axis for a plot. This dataframe can then be joined to the DED prescription data for 2024, in order to determine the number of DED items prescribed per patient of each GP practice. When plotted on a graph, a log scale can be used which prevents extremes that might stretch the plot and makes the trends more easy to see. What can then be observed is how the ratio of female-to-male in a gp practice may impact the number of DED prescriptions per person.
 
 ```{r}
 ded_by_gp_2024 <- ded_prescriptions %>%
@@ -197,9 +213,7 @@ sex_population <- practice_populations %>%
 
 ded_per_sex_gp_2024 <- inner_join(ded_by_gp_2024, sex_population, by = c("gp_practice" = "practice_code")) %>%
   mutate(rate_per_person = total_paid_quantity / All)
-```
 
-```{r}
 ggplot(ded_per_sex_gp_2024, aes(x = female_to_male_ratio, y = rate_per_person, size = All)) +
   geom_point(color = "pink1", alpha = 0.7) +
   geom_smooth(method = "lm", se = TRUE, color = "black", linetype = "dashed", linewidth = 1) +
@@ -221,20 +235,25 @@ ggplot(ded_per_sex_gp_2024, aes(x = female_to_male_ratio, y = rate_per_person, s
   )
 ```
 
-```{r}
-hb_pop_normalised <- practice_populations %>%
-  rowwise() %>%
-  mutate(
-    weighted_age = (ages0to4*2.5 + ages5to14*10 + ages15to24*20 + ages25to44*34.5 + ages45to64*54.5 + ages65to74*69.5 + ages75to84*79.5 + ages85plus*90) / all_ages)
+What can be observed is a slight positive relationship. As the ratio of female to male increases in GP practices, there is an increase in the prescription of DED items across GP practices, supporting the evidence that females are more likely to have DED.
 
-joined_hbt_DED <- inner_join(ded_by_gp_2024, hb_pop_normalised, by = c("gp_practice" = "practice_code")) %>%
+### Age
+
+From the practice populations data, there is a new column added for the weighted mean age for each GP practice, which is calculated by taking the center number of each age group and multiplying each row by that number, then dividing by total number. This data can then be joined to the DED prescription data for 2024, and then the number of DED prescriptions per person can be calculated for each GP practice, with the x-axis as the weighted mean age for each GP practice.
+
+```{r}
+practice_pop_normalised <- practice_populations %>%
+  rowwise() %>% # Performs each row independently
+  mutate(weighted_age = (ages0to4*2.5 + ages5to14*10 + ages15to24*20 + ages25to44*34.5 + ages45to64*54.5 + ages65to74*69.5 + ages75to84*79.5 + ages85plus*90) / all_ages)
+
+joined_gp_ded <- inner_join(ded_by_gp_2024, practice_pop_normalised, by = c("gp_practice" = "practice_code")) %>%
   filter(sex == "All") %>%
   mutate(rate_per_person = total_paid_quantity / all_ages) %>%
     filter(!is.na(weighted_age))
 ```
 
 ```{r}
-ggplot(joined_hbt_DED, aes(x = weighted_age, y = rate_per_person, size = all_ages)) +
+ggplot(joined_gp_ded, aes(x = weighted_age, y = rate_per_person, size = all_ages)) +
   geom_point(color = "brown1", alpha = 0.7) +
   geom_smooth(method = "lm", se = TRUE, color = "black", linetype = "dashed", linewidth = 1) +
   scale_x_continuous(labels = scales::comma_format(accuracy = 0.1)) +
@@ -254,3 +273,13 @@ ggplot(joined_hbt_DED, aes(x = weighted_age, y = rate_per_person, size = all_age
     legend.position = "bottom"
   )
 ```
+
+As expected, there is a positive relationship between weighted mean age and prescription of DED items per person.
+
+# Conclusion
+
+Dry eye disease is a prevalent and debilitating condition costing millions in healthcare worldwide with significant burden on the quality of life of patients. As dry eye disease is a chronic condition with numerous risk factors depending on the patient’s background, lifestyle and environment, the experience and perception of patients can vary widely between individuals.
+
+Better understanding of the seasonal trends of DED in Scotland,
+
+More in-depth research into potential differences in dry eye phenotypes as well as awareness of this condition between different age groups, would be highly relevant to inform clinical management and effective patient communication; this should include the paediatric population for which dry eye disease is also becoming increasingly common. (Chiang)
