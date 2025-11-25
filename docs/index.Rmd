@@ -103,7 +103,7 @@ ded_prescriptions_rurality <- full_join(ded_prescriptions_by_gp, gp_rurality, by
   filter(!is.na(urban_rural6fold2020)) %>%
   group_by(urban_rural6fold2020) %>%
   summarise(total_paid_quantity = sum(total_paid_quantity, na.rm = TRUE), total_practice_list_size = sum(practice_list_size, na.rm = TRUE)) %>%
-  mutate(proportion_quantity = total_paid_quantity / total_practice_list_size, factor(urban_rural6fold2020, levels = 1:6, labels = c("Large Urban Areas", "Other Urban Areas", "Accessible Small Towns", "Remote Small Towns", "Accessible Rural", "Remote Rural")))
+  mutate(proportion_quantity = total_paid_quantity / total_practice_list_size, urban_rural6fold2020 = factor(urban_rural6fold2020, levels = 1:6, labels = c("Large Urban Areas [1]", "Other Urban Areas [2]", "Accessible Small Towns [3]", "Remote Small Towns [4]", "Accessible Rural [5]", "Remote Rural [6]")))
 ```
 
 ```{r}
@@ -142,87 +142,81 @@ ded_prescriptions_rurality %>%
 ```
 
 ```{r}
-practice_populations <- read_csv("https://www.opendata.nhs.scot/dataset/e3300e98-cdd2-4f4e-a24e-06ee14fcc66c/resource/cec9341e-ccba-4c71-afe4-a614f5e97b9f/download/practice_listsizes_oct2024-open-data.csv")
-```
-
-```{r}
-practice_populations <- practice_populations %>%
+practice_populations <- read_csv("data/practice_populations/ce967fa9-0f7f-4389-9f19-4958c45e43c2.csv") %>%
   clean_names()
 ```
 
 ```{r}
-hbt_DED_2024 <- combined_DED_med %>%
+ded_by_gp_2024 <- ded_prescriptions %>%
   filter(str_starts(as.character(paid_date_month), "2024")) %>%
-  group_by(hbt) %>%
+  group_by(gp_practice) %>%
   summarise(total_paid_quantity = sum(paid_quantity, na.rm = TRUE))
 
-gender_population <- practice_populations %>%
-    group_by(sex, hb) %>%
-    filter(sex %in% c("Female", "Male")) %>%
-    summarise(total_all_ages = sum(all_ages, na.rm = TRUE))
+sex_population <- practice_populations %>%
+    group_by(sex, practice_code) %>%
+    summarise(total_all_ages = sum(all_ages, na.rm = TRUE)) %>%
+    pivot_wider(names_from = sex, values_from = total_all_ages) %>%
+    mutate(female_to_male_ratio = Female / Male) %>%
+    filter(!is.na(female_to_male_ratio))
 
-joined_gender_DED <- inner_join(hbt_DED_2024, gender_population, by = c("hbt" = "hb"))
-
-joined_gender_DED <- joined_gender_DED %>%
-  mutate(rate_per_1000 = total_paid_quantity / total_all_ages * 1000)
-
-ggplot(joined_gender_DED, aes(x = hbt, y = rate_per_1000, fill = sex)) +
-  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+ded_per_sex_gp_2024 <- inner_join(ded_by_gp_2024, sex_population, by = c("gp_practice" = "practice_code")) %>%
+  mutate(rate_per_person = total_paid_quantity / All)
+```
+  
+```{r}
+ggplot(ded_per_sex_gp_2024, aes(x = female_to_male_ratio, y = rate_per_person, size = All)) +
+  geom_point(color = "pink1", alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE, color = "black", linetype = "dashed", linewidth = 1) +
+  scale_x_log10(labels = scales::comma_format(accuracy = 0.01)) +  # Prevents extreme ratios from stretching the plot and makes trends easier to see.
+  scale_y_continuous(labels = scales::comma_format(accuracy = 0.01)) +
+  scale_size_continuous(name = "Practice Population", range = c(2, 8)) +
   labs(
-    title = "DED Prescriptions per 1000 Patients by Health Board and Gender (2024)",
-    x = "Health Board (HBT)",
-    y = "DED Prescriptions per 1000 Patients",
-    fill = "Sex"
+    title = "Effect of Female-to-Male Ratio on DED Prescription Rate (2024)",
+    subtitle = "Each point represents a GP practice",
+    x = "Female-to-Male Ratio (log scale)",
+    y = "DED Items per Person",
+    caption = "Source: Scottish GP prescribing data"
   ) +
   theme_minimal(base_size = 14) +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    plot.title = element_text(face = "bold", size = 16)
-  ) +
-  scale_fill_manual(values = c("Female" = "#FF69B4", "Male" = "#1E90FF")) +
-  geom_text(aes(label = round(rate_per_1000, 1)), 
-            position = position_dodge(width = 0.7), vjust = -0.5, size = 3)
-```
-
-```{r}
-hb_practice_populations <- practice_populations %>%
-  select(-date, -practice_code) %>%
-  group_by(hb) %>%
-  summarise(across(where(is.numeric), ~ sum(.x, na.rm = TRUE)))
-
-joined_hbt_DED <- inner_join(hbt_DED_2024, hb_practice_populations, by = c("hbt" = "hb"))
-
-hb_long <- joined_hbt_DED %>%
-  pivot_longer(
-    cols = starts_with("ages"),
-    names_to = "age_group",
-    values_to = "population")
-
-hb_long <- hb_long %>%
-  mutate(
-    age_group = factor(
-      age_group,
-      levels = c(
-        "ages0to4", "ages5to14", "ages15to24", "ages25to44",
-        "ages45to64", "ages65to74", "ages75to84", "ages85plus")))
-
-hb_long <- hb_long %>%
-  mutate(rate_per_1000 = total_paid_quantity / population * 1000)
-```
-
-```{r}
-ggplot(hb_long, aes(x = age_group, y = rate_per_1000, color = hbt, group = hbt)) +
-  geom_line(linewidth = 1) +
-  geom_point(size = 2) +
-  labs(
-    title = "DED Uptake Rate per 1000 Patients by Age Group and Health Board",
-    x = "Age Group",
-    y = "Rate per 1000 Patients",
-    color = "Health Board"
-  ) +
-  theme_minimal(base_size = 14) +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
     legend.position = "bottom"
   )
 ```
+
+```{r}
+hb_pop_normalised <- practice_populations %>%
+  rowwise() %>%
+  mutate(
+    weighted_age = (ages0to4*2.5 + ages5to14*10 + ages15to24*20 + ages25to44*34.5 + ages45to64*54.5 + ages65to74*69.5 + ages75to84*79.5 + ages85plus*90) / all_ages)
+
+joined_hbt_DED <- inner_join(ded_by_gp_2024, hb_pop_normalised, by = c("gp_practice" = "practice_code")) %>%
+  filter(sex == "All") %>%
+  mutate(rate_per_person = total_paid_quantity / all_ages) %>%
+    filter(!is.na(weighted_age))
+```
+
+```{r}
+ggplot(joined_hbt_DED, aes(x = weighted_age, y = rate_per_person, size = all_ages)) +
+  geom_point(color = "brown1", alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE, color = "black", linetype = "dashed", linewidth = 1) +
+  scale_x_continuous(labels = scales::comma_format(accuracy = 0.1)) +
+  scale_y_continuous(labels = scales::comma_format(accuracy = 0.01)) +
+  scale_size_continuous(name = "Practice Population", range = c(2, 8)) +
+  labs(
+    title = "Effect of Weighted Mean Age on DED Prescription Rate (2024)",
+    subtitle = "Each point represents a GP practice",
+    x = "Weighted Mean Age of Practice Population",
+    y = "DED Items per Person",
+    caption = "Source: Scottish GP prescribing data"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
+    legend.position = "bottom"
+  )
+```
+
+
