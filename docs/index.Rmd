@@ -6,55 +6,41 @@ date: "2025-11-12"
 
 This project aims to look at "trends in the prescribing of dry eye disease medication across the four seasons in Scotland."
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+Introduction-
 
-Loading libraries
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.show = "hold"
+)
+knitr::opts_knit$set(root.dir = "/Users/james/B249281")
+```
 
 ```{r}
 library(tidyverse)
 library(janitor)
+library(gt)
+library(scales)
 ```
 
-Firstly, dataframes are loaded that include data of prescriptions from January to June and July to December in 2024. These dataframes are then bound together to create a single dataframe that represents the total prescriptions in 2024, which is then cleaned.
-
 ```{r}
-dbb_jan_jun_2024 <- read.csv("https://www.opendata.nhs.scot/dataset/84393984-14e9-4b0d-a797-b288db64d088/resource/f0df380b-3f9b-4536-bb87-569e189b727a/download/hb_pitc2024_01_06-1.csv")
+prescribing_data <- list.files("data/prescribing_data", full.names = TRUE) %>% 
+  set_names() %>%
+  map(~ read_csv(.x) %>%
+        rename(any_of(c(HBT = "HBT2014"))) %>%
+        select(HBT, BNFItemCode, BNFItemDescription, GPPractice, NumberOfPaidItems, PaidQuantity, GrossIngredientCost, PaidDateMonth))
 
-dbb_july_dec_2024 <- read.csv("https://www.opendata.nhs.scot/dataset/84393984-14e9-4b0d-a797-b288db64d088/resource/f3b9f2e2-66c0-4310-9b8e-734781d2ed0a/download/hb_pitc2024_07_12-1.csv")
-
-dbb_jan_jun_2024$DMDCode <- as.character(dbb_jan_jun_2024$DMDCode)
-
-dbb_2024 <- bind_rows(dbb_jan_jun_2024, dbb_july_dec_2024)
-
-dbb_2024 <- dbb_2024 %>%
+ded_prescriptions <- prescribing_data %>%
+  map(~ .x %>% filter(grepl("110801", BNFItemCode))) %>%
+  bind_rows() %>%
   clean_names()
 ```
 
-Next, looking at the BNF Code Information - Current - October 2025 Version 88, available through this link: <https://opendata.nhsbsa.net/dataset/bnf-code-information-current-year/resource/0a2aa4d6-f4af-4adb-9c0a-ac5bc5490b23?filters=>, it is possible to filter for BNF_CHAPTER "Eye", then further filter for BNF_SUBPARAGRAPH "Tear deficiency, eye lubricant/astringent", which then reveals that the BNF item code for dry eye disease (DED) medication begins with the digits 110801, which can be used to specifically identify DED medication in the dataframe that represents total prescriptions in 2024.
-
 ```{r}
-DED_med_dbb_2024 <- dbb_2024 %>%
-  filter(grepl("110801", bnf_item_code))
-```
-
-This dataframe that has been filtered for the DED medications can then be grouped by month then summed to find the total paid quantity of prescriptions of DED medication for each month.
-
-```{r}
-grouped_DED_med <- DED_med_dbb_2024 %>%
-  group_by(paid_date_month) %>%
-    summarise(total_paid_quantity = sum(paid_quantity))
-```
-
-The months are originally given in an unpresentable form as "2024XX", which is unsuitable for a plot, so a new column is added with the corresponding last numbers, and they are then individually assigned the month's name as a string, assigned levels in order for the graph to present the months in the correct order, and given the corresponding season. The graph is then plotted using ggplot, using the month as the X axis, the total paid quantity as Y, and the color as the season in order to visualise each of the four seasons.
-
-```{r}
-grouped_DED_med <- grouped_DED_med %>%
-  mutate(
-    month = paid_date_month %% 100,
-    
-    month_name = case_when(
+ded_seasonal_summary <- ded_prescriptions %>%
+  mutate(month = paid_date_month %% 100, month_name = case_when(
       month == 1  ~ "January",
       month == 2  ~ "February",
       month == 3  ~ "March",
@@ -66,42 +52,177 @@ grouped_DED_med <- grouped_DED_med %>%
       month == 9  ~ "September",
       month == 10 ~ "October",
       month == 11 ~ "November",
-      month == 12 ~ "December"),
-    
-    month_name = factor(month_name, levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")),
-
+      month == 12 ~ "December")) %>%
+  group_by(month_name, month) %>%
+    summarise(total_paid_quantity = sum(paid_quantity)) %>%
+  mutate(month_name = factor(month_name, levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")),
     season = case_when(
       month %in% c(3, 4, 5)  ~ "Spring",
       month %in% c(6, 7, 8)  ~ "Summer",
       month %in% c(9, 10, 11) ~ "Autumn",
       month %in% c(12, 1, 2) ~ "Winter"))
-
-ggplot(grouped_DED_med, aes(x = month_name, y = total_paid_quantity, group = 1, color = season)) +
-  geom_line() + 
-  geom_point() +
-  scale_color_manual(values = c("Spring" = "green", "Summer" = "orange", "Autumn" = "brown", "Winter" = "blue")) +
-  labs(
-    title = "Paid Quantity of Dry Eye Disease Medication over Each Month in 2024",
-    x = "Month",
-    y = "Total Paid Quantity",
-    color = "Season"
-    )
 ```
 
-This graph shows an interesting variation across each month, with the peaks in each respective season being January (Winter), May (Spring), August (Summer), and October (Autumn). Notably, as the year moves from winter to autumn, the respective peaks decrease over the year.
+```{r}
+ggplot(ded_seasonal_summary, aes(x = month_name, y = total_paid_quantity, group = 1, color = season)) +
+  geom_line(size = 1.2) + 
+  geom_point(size = 2) +
+  scale_color_manual(values = c("Spring" = "green3", "Summer" = "orange", "Autumn" = "brown1", "Winter" = "blue")) +
+  labs(
+    title = "Monthly Paid Quantity of Dry Eye Disease Medications (2022-2024)",
+    subtitle = "Grouped by Season",
+    x = "Month",
+    y = "Total Paid Quantity",
+    color = "Season") +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12)) +
+  geom_smooth(aes(group = 1), method = "loess", se = FALSE, linetype = "dashed", color = "black")
+```
 
-Potentially, the results could follow this pattern:
+```{r}
+gp_details <- read_csv("data/gp_details/0d2e258a-1451-4af1-a7e5-e8327994fa55.csv") %>%
+  select(PracticeCode, DataZone, PracticeListSize) %>%
+  clean_names()
 
-Prescriptions peak in January as it is in the middle of winter where there is cold, dry air. Prescriptions begin to lower as it warms. Once it reaches May, there is another peak as spring allergies begin. Prescriptions begin to lower again until July/August as summer begins, where temperatures rise and individuals are more prone to go outdoors, which could expose the eyes to more irritation. As it cools again and reaches Autumn, the prescriptions decrease.
+urban_rural <- read_csv("data/urban_rural/c8bd76cd-6613-4dd7-8a28-6c99a16dc678.csv") %>%
+  select(DataZone, UrbanRural6fold2020) %>%
+  clean_names()
 
--Moving forward
+gp_rurality <- inner_join(gp_details, urban_rural, by = "data_zone")
+```
 
-More analysis into the seasonal variations.
+```{r}
+ded_prescriptions_by_gp <- ded_prescriptions %>%
+  group_by(gp_practice) %>%
+  summarise(total_paid_quantity = sum(paid_quantity, na.rm = TRUE))
 
-Include data from several years instead of just 2024.
+ded_prescriptions_rurality <- full_join(ded_prescriptions_by_gp, gp_rurality, by = c("gp_practice" = "practice_code")) %>%
+  filter(!is.na(urban_rural6fold2020)) %>%
+  group_by(urban_rural6fold2020) %>%
+  summarise(total_paid_quantity = sum(total_paid_quantity, na.rm = TRUE), total_practice_list_size = sum(practice_list_size, na.rm = TRUE)) %>%
+  mutate(proportion_quantity = total_paid_quantity / total_practice_list_size, factor(urban_rural6fold2020, levels = 1:6, labels = c("Large Urban Areas", "Other Urban Areas", "Accessible Small Towns", "Remote Small Towns", "Accessible Rural", "Remote Rural")))
+```
 
-Look at links of usage of allergy medicine (e.g. antihistamines) and DED medication, to determine allergy's impact.
+```{r}
+ded_prescriptions_rurality %>%
+  mutate(itemsperperson = total_paid_quantity / total_practice_list_size) %>%
+  select(urbanrural = urban_rural6fold2020, total_items = total_paid_quantity, total_population = total_practice_list_size, itemsperperson) %>%
+  gt() %>%
+  tab_header(
+    title = md("**Dry Eye Medication Prescribing by Urban–Rural Classification**"),
+    subtitle = "Standardised by practice list size, Scotland (2024)") %>%
+  fmt_number(
+    columns = c(total_items, total_population),
+    decimals = 0,
+    use_seps = TRUE) %>%
+  fmt_number(
+    columns = itemsperperson,
+    decimals = 3) %>%
+  cols_label(
+    urbanrural = "Urban/Rural Category",
+    total_items = "Total DED Items Dispensed",
+    total_population = "Total Practice Population",
+    itemsperperson = "Items per Person") %>%
+  tab_style(
+    style = list(cell_text(weight = "bold")), locations = cells_title(groups = "title")) %>%
+  tab_style(
+    style = cell_borders(sides = "bottom", color = "black", weight = px(2)),
+    locations = cells_column_labels()) %>%
+  tab_options(
+    table.font.size = 14,
+    column_labels.background.color = "#f0f0f0",
+    data_row.padding = px(6),
+    table.border.top.color = "white",
+    table.border.bottom.color = "white",
+    heading.title.font.size = 20,
+    heading.subtitle.font.size = 14)
+```
 
-Looking into the link of cities vs more rural towns on DED medication usage, which furthermore could look at air quality.
+```{r}
+practice_populations <- read_csv("https://www.opendata.nhs.scot/dataset/e3300e98-cdd2-4f4e-a24e-06ee14fcc66c/resource/cec9341e-ccba-4c71-afe4-a614f5e97b9f/download/practice_listsizes_oct2024-open-data.csv")
+```
 
-Looking at the impact of different climates and humidities in Scotland on DED.
+```{r}
+practice_populations <- practice_populations %>%
+  clean_names()
+```
+
+```{r}
+hbt_DED_2024 <- combined_DED_med %>%
+  filter(str_starts(as.character(paid_date_month), "2024")) %>%
+  group_by(hbt) %>%
+  summarise(total_paid_quantity = sum(paid_quantity, na.rm = TRUE))
+
+gender_population <- practice_populations %>%
+    group_by(sex, hb) %>%
+    filter(sex %in% c("Female", "Male")) %>%
+    summarise(total_all_ages = sum(all_ages, na.rm = TRUE))
+
+joined_gender_DED <- inner_join(hbt_DED_2024, gender_population, by = c("hbt" = "hb"))
+
+joined_gender_DED <- joined_gender_DED %>%
+  mutate(rate_per_1000 = total_paid_quantity / total_all_ages * 1000)
+
+ggplot(joined_gender_DED, aes(x = hbt, y = rate_per_1000, fill = sex)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+  labs(
+    title = "DED Prescriptions per 1000 Patients by Health Board and Gender (2024)",
+    x = "Health Board (HBT)",
+    y = "DED Prescriptions per 1000 Patients",
+    fill = "Sex"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(face = "bold", size = 16)
+  ) +
+  scale_fill_manual(values = c("Female" = "#FF69B4", "Male" = "#1E90FF")) +
+  geom_text(aes(label = round(rate_per_1000, 1)), 
+            position = position_dodge(width = 0.7), vjust = -0.5, size = 3)
+```
+
+```{r}
+hb_practice_populations <- practice_populations %>%
+  select(-date, -practice_code) %>%
+  group_by(hb) %>%
+  summarise(across(where(is.numeric), ~ sum(.x, na.rm = TRUE)))
+
+joined_hbt_DED <- inner_join(hbt_DED_2024, hb_practice_populations, by = c("hbt" = "hb"))
+
+hb_long <- joined_hbt_DED %>%
+  pivot_longer(
+    cols = starts_with("ages"),
+    names_to = "age_group",
+    values_to = "population")
+
+hb_long <- hb_long %>%
+  mutate(
+    age_group = factor(
+      age_group,
+      levels = c(
+        "ages0to4", "ages5to14", "ages15to24", "ages25to44",
+        "ages45to64", "ages65to74", "ages75to84", "ages85plus")))
+
+hb_long <- hb_long %>%
+  mutate(rate_per_1000 = total_paid_quantity / population * 1000)
+```
+
+```{r}
+ggplot(hb_long, aes(x = age_group, y = rate_per_1000, color = hbt, group = hbt)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  labs(
+    title = "DED Uptake Rate per 1000 Patients by Age Group and Health Board",
+    x = "Age Group",
+    y = "Rate per 1000 Patients",
+    color = "Health Board"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
+  )
+```
