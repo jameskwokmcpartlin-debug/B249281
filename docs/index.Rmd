@@ -1,6 +1,6 @@
 ---
 title: "Do seasons, rurality, sex, and age impact prescriptions of DED in Scotland?"
-author: "James McPartlin"
+author: "B249281"
 date: "`r Sys.Date()`"
 bibliography: references.bib
 csl: harvard.csl
@@ -11,6 +11,7 @@ output:
     toc_depth: 3 # Sets level of headings to maximum of 3
     number_sections: true
     theme: flatly
+    code_folding: hide
 ---
 
 # Introduction
@@ -46,9 +47,7 @@ library(janitor)
 library(gt)
 library(scales)
 library(plotly)
-```
 
-```{r}
 # Here the data is loaded programatically from local files instead of manually which keeps the coding more DRY and makes it easier for datasets to be added or removed without major disruption.
 prescription_data <- list.files("data/prescription_data", full.names = TRUE) %>% 
   set_names() %>%
