@@ -16,7 +16,7 @@ output:
 
 # Introduction
 
-Dry eye disease (DED) is a widespread, debilitating ocular condition that costs the NHS millions each year [@chiang2025] [@hossain2021]. This study looks for trends in data from Public Health Scotland (PHS) to identify risk factors for DED. The research question is: Do seasons, rurality, sex, and age impact prescriptions of DED in Scotland? The results indicate that sex and age are possible risk factors, while seasonal variation did not show an impact, and rurality results were inconclusive.
+Dry eye disease (DED) is a widespread, debilitating ocular condition that costs the NHS millions each year [@chiang2025] [@hossain2021]. This study looks for trends in data from Public Health Scotland (PHS) to identify associations for DED. The research question is: Do seasons, rurality, sex, and age impact prescriptions of DED in Scotland? The results indicate that sex and age are possible associations, while seasonal variation did not show an impact, and rurality results were inconclusive.
 
 # Data
 
@@ -301,6 +301,6 @@ One limitation is that this plot uses the total number of prescriptions of each 
 
 # Conclusion
 
-This study has considered whether seasonal variation, rurality, sex and age affect DED prescriptions in Scotland. The results suggest possible positive correlations with sex and age, which is consistent with previous research. Seasonal variation did not appear to be a risk factor, and the results of the rurality study indicated some patterns, but not as expected. The study revealed that total prescriptions have declined over the 3-year period of the study. The reasons for this decline need to be investigated. Further research with more detailed data and longer timescales may give more conclusive results.
+This study has considered whether seasonal variation, rurality, sex and age affect DED prescriptions in Scotland. The results suggest possible positive correlations with sex and age, which is consistent with previous research. Seasonal variation did not appear to be associated, and the results of the rurality study indicated some patterns, but not as expected. The study revealed that total prescriptions have declined over the 3-year period of the study. The reasons for this decline need to be investigated. Further research with more detailed data and longer timescales may give more conclusive results.
 
 # References
