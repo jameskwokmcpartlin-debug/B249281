@@ -1,32 +1,38 @@
 ---
-title: "Assessment"
-output: html_document
-date: "2025-11-12"
+title: "Do seasons, rurality, sex, and age impact prescriptions of DED in Scotland?"
+author: "James McPartlin"
+date: "`r Sys.Date()`"
+bibliography: references.bib
+csl: harvard.csl
+output: 
+  html_document:
+    toc: true # Adds table of contents
+    toc_float: true # Makes table of contents float
+    toc_depth: 3 # Sets level of headings to maximum of 3
+    number_sections: true
+    theme: flatly
 ---
-
-This project aims to look at trends in the prescribing of dry eye disease medication in Scotland by seasons, rurality, sex, and age.
 
 # Introduction
 
-Dry eye is a condition of various aetiologies which causes ocular surface inflammation and corneal and conjunctival epithelial cell damage [1], [2], [3]. Symptoms include irritation, grittiness, burning, soreness, watery eyes and visual disturbances potentially affecting one or both eyes (Bilkhu).
+Dry eye disease (DED) is a widespread, debilitating ocular condition that costs the NHS millions each year [@chiang2025] [@hossain2021]. This study looks for trends in data from Public Health Scotland (PHS) to identify risk factors for DED. The research question is: Do seasons, rurality, sex, and age impact prescriptions of DED in Scotland? The results indicate that sex and age are possible risk factors, while seasonal variation did not show an impact, and rurality results were inconclusive.
 
-Dry eye is initiated through mechanisms of tear film hyper-osmolarity and tear film instability [1] and can be broadly divided in to two types, aqueous deficiency and evaporative dry eye. (Bilkhu)
+# Data
 
-Global DED prevalence is estimated to range from 5% to 50%,2 with estimates in Europe ranging from 10% to 30% (Hossain).
+The study uses the following data from PHS:
 
-However, it is expected that the number of dry eye patients encountered in UK clinical practice may increase with an aging population. (Bilkhu)
+-   Data by Prescriber Location from January 2022 to December 2024: <https://www.opendata.nhs.scot/dataset/prescriptions-in-the-community>
+-   GP Practice Population Demographics January 2023, 2024 & 2025: <https://www.opendata.nhs.scot/dataset/gp-practice-populations>
+-   GP Practice Contact Details and List Sizes January 2025: <https://www.opendata.nhs.scot/dataset/gp-practice-contact-details-and-list-sizes>
+-   Data Zone (2011) Urban Rural Classification 2020: <https://www.opendata.nhs.scot/dataset/urban-rural-classification>
 
-Prevalence of DED in the UK is higher in women compared with men and increases with age, with the majority of individuals with DED aged \>50 years (Hossain).
+In the Data by Prescriber Location data set, the data selected was classified as ‘Tear deficiency, eye lubricant and astringent’ using the BNF item code (which can be determined in this table: <https://opendata.nhsbsa.net/dataset/bnf-code-information-current-year>).
 
-DED is a major cause for prescribing in primary medical care in the National Health Service in England. In 2014, over 6.4 million prescription items for DED (ie, artificial tears, ocular lubricants and astringents) were dispensed in the community at a cost of more than £27 million to the National Health Service (Hossain).
-
-DED can impact health-related and vision-related quality of life (QoL), with affected patients showing greater functional impairment associated with physical fatigue, pain, depression, total symptom burden and QoL.8 Moreover, patients are more likely to experience problems with reading, television and computer use, driving and performing professional work.9 In addition, DED was associated with approximately 30% impairment in workplace performance, work productivity and non-job-related activities in a prospective cross-sectional study.10 (Hossain)
-
-In a systematic literature search supplemented with information from interviews of ophthalmologists, the annual healthcare costs for 1000 patients with DED who were managed by ophthalmologists in the UK were estimated to be US\$1.10 million (2003/2004 prices), with almost one-half of the total attributed to prescription drug costs. Some patients suffering from DED self-treat their symptoms with over-the-counter artificial tears or are treated by general practitioners/optometrists/pharmacists; thus, annual costs could be higher as only reimbursed treatments prescribed by ophthalmologists were captured in this estimate (Hossain).
+The study uses paid_quantity to measure volume of prescriptions. According to PHS, this is defined as: "the number of doses or uses within a single item, rather than the quantity of the item itself."
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-  echo = TRUE, # Show R code in output
+  echo = TRUE, # Hides code, only shows R code in output
   message = FALSE, # Prevent package messages
   warning = FALSE) # Prevent warning messages
 
@@ -39,247 +45,263 @@ library(tidyverse)
 library(janitor)
 library(gt)
 library(scales)
-library(here)
+library(plotly)
+```
+
+```{r}
+# Here the data is loaded programatically from local files instead of manually which keeps the coding more DRY and makes it easier for datasets to be added or removed without major disruption.
+prescription_data <- list.files("data/prescription_data", full.names = TRUE) %>% 
+  set_names() %>%
+  map(~ read_csv(.x) %>%
+  rename(any_of(c(HBT = "HBT2014"))) %>% # A minority of the Data by Prescriber Location's column for their healthboard is named 'HBT2014', and they need to be renamed to 'HBT' in order to successfully combined into a single dataset.
+  select(HBT, BNFItemCode, BNFItemDescription, GPPractice, NumberOfPaidItems, PaidQuantity, GrossIngredientCost, PaidDateMonth))
+
+# A function is not used for data by prescriber location since the data is only bound after filtering for DED, as the data is otherwise too large and results in memory errors.
+ded_prescriptions <- prescription_data %>%
+  map(~ .x %>% filter(grepl("110801", BNFItemCode))) %>% # This allows filtering only for the BNFItemCodes that begin with 110801 - the DED prescriptions.
+  bind_rows() %>%
+  clean_names()
+
+read_folder <- function(path, select_cols = NULL) { # This function allows the rest of the datasets to be loaded and combined, and makes the code more DRY.
+  list.files(path, full.names = TRUE) %>%
+    set_names() %>%
+    map(read_csv) %>%
+    bind_rows() %>%
+    clean_names()}
+
+gp_details <- read_folder(path = "data/gp_details", select_cols = c("PracticeCode", "DataZone", "PracticeListSize"))
+
+gp_populations <- read_folder(path = "data/gp_populations")
+
+urban_rural_classification <- read_folder(path = "data/urban_rural_classification", select_cols = c("DataZone", "UrbanRural8fold2020"))
 ```
 
 # Results
 
-## Sourcing the raw data
-
-The files are downloaded from the Prescriptions in the Community page from Public Health Scotland. The data selected and downloaded are the Data by Prescriber Location from January 2022 to Decemeber 2024, in order to show more comprehensive data over several years. They are then put into the prescribing_data subfolder within the data folder.
-
-In order to determine which prescriptions are related to DED, the BNF Code Information (accessible here: <https://opendata.nhsbsa.net/dataset/bnf-code-information-current-year>) can be used to filter for Tear deficiency, eye lubricant and astringent within BNF_PARAGRAPH. From this, it can be determined that these DED medications' BNFItemCode in prescribing_data begin with '110801'.
-
-```{r}
-# Here the data is loaded programatically instead of manually which keeps the coding more DRY and makes it easier for future months to be added and analysed.
-
-prescribing_data <- list.files("data/prescribing_data", full.names = TRUE) %>% 
-  set_names() %>%
-  map(~ read_csv(.x) %>%
-  rename(any_of(c(HBT = "HBT2014"))) %>% # Some of the Data by Prescriber Location files' column for their healthboard is named HBT2014 which means they must be renamed in order to be later combined into a single dataframe.
-  select(HBT, BNFItemCode, BNFItemDescription, GPPractice, NumberOfPaidItems, PaidQuantity, GrossIngredientCost, PaidDateMonth)) # Selecting only the columns relevant to the study and for cleaner data.
-
-ded_prescriptions <- prescribing_data %>%
-  map(~ .x %>% filter(grepl("110801", BNFItemCode))) %>% # This allows to filter only for the DED prescriptions, which BNFItemCode begins with 110801.
-  bind_rows() %>%
-  clean_names()
-```
-
 ## Seasonal Variation
 
-It has been shown that patients who participate in over four hours of outdoor activity on a weekend day are 2.4 times more likely to experience DED. This is likely due to a variety of factors related to the environmental impact of the outdoors, such as, temperature, humidity, wind, precipitation, sunlight exposure, and air pollution. Moreover, it has been shown that any allergy, which often are exacerbated seasonally, are significant risk factors of DED (vidal-rohr). This raises the question of if, and how seasonality and climate can affect the prescriptions of DED medication, and can be useful data for clinicians and pharmacists to predict variations in the amount of medication they may have to prescribe over the year.
-
-The DED prescriptions data includes information on which month and year it was prescribed, which can be used to be stratified into each month. By grouping by month, it can be determined how many items were prescribed (the column of paid_quantity) in each month. Furthermore, these months can be assigned into the four seasons which allow for a clean final visualisation. Finally, using a trend line via geom_smooth() allows for the overall trend to be observed.
+Studies have shown that DED is more common in patients who spend time outdoors, due to the impact of weather, pollution and allergies [@vidal-rohra2023]. This suggests that prescriptions may vary in relation to seasons. To measure seasonal variation, the volume of prescriptions per month was calculated and assigned to a season. This was faceted over 3 years. Trend lines were drawn to allow the overall trends to be observed.
 
 ```{r}
+# This calculates the total paid quantity of DED prescriptions for each month, then assign each month to its respective season.
 ded_seasonal_summary <- ded_prescriptions %>%
-  mutate(month = paid_date_month %% 100, month_name = case_when(
-    month == 1  ~ "January",
-    month == 2  ~ "February",
-    month == 3  ~ "March",
-    month == 4  ~ "April",
-    month == 5  ~ "May",
-    month == 6  ~ "June",
-    month == 7  ~ "July",
-    month == 8  ~ "August",
-    month == 9  ~ "September",
-    month == 10 ~ "October",
-    month == 11 ~ "November",
-    month == 12 ~ "December")) %>%
-  group_by(month_name, month) %>%
+  mutate(month = paid_date_month %% 100, # Since the dates comes in the format YYYYMM, you can divide by 100 and take the remainder to find the month.
+    year = paid_date_month %/% 100, # This gives the year by dividing by 100 and dropping the remainder. The remaining integers is the year.
+    month_name = month.name[month]) %>% # A DRY way to assign the actual name of the month based on the month's corresponding number from 1-12.
+  group_by(month_name, month, year) %>%
     summarise(total_paid_quantity = sum(paid_quantity)) %>%
-  mutate(month_name = factor(month_name, levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")),
+  mutate(month_name = factor(month_name, levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")), # Ensures the x-axis of months appears in the correct order.
          season = case_when(
            month %in% c(3, 4, 5)  ~ "Spring",
            month %in% c(6, 7, 8)  ~ "Summer",
            month %in% c(9, 10, 11) ~ "Autumn",
-           month %in% c(12, 1, 2) ~ "Winter"))
+           month %in% c(12, 1, 2) ~ "Winter"),
+         season = factor(season, levels = c("Winter", "Spring", "Summer", "Autumn"))) # Here, the months are assigned to their corresponding season, then set to appear in the correct order at the side of the graph.
 
+my_breaks <- function(x) pretty(x, n = 3) # This function is used in the ggplot to set the total number of breaks of each graph (the amount of labels on the y-axis) to 3, so that the plot is less messy.
+
+# Plots the total paid quantity by month, groups to 1 to ensure 1 continuous line, colours by season, draws a curved line, and facets by year.
 ggplot(ded_seasonal_summary, aes(x = month_name, y = total_paid_quantity, group = 1, color = season)) +
-  geom_line(size = 1.2) + 
+  geom_line(size = 1.5) + 
   geom_point(size = 2) +
-  scale_color_manual(values = c("Spring" = "green3", "Summer" = "orange", "Autumn" = "brown1", "Winter" = "blue")) +
+  scale_color_manual(values = c("Spring" = "green3", "Summer" = "orange", "Autumn" = "brown1", "Winter" = "blue")) + # Assigns specific colours for each season.
   labs(
-    title = "Monthly Paid Quantity of Dry Eye Disease Medications (2022-2024)",
-    subtitle = "Grouped by Season",
     x = "Month",
     y = "Total Paid Quantity",
+    title = "Monthly Paid Quantity of DED Prescriptions (2022-2024)",
+    subtitle = "Coloured by Season",
     color = "Season") +
-  theme_minimal(base_size = 14) +
+  theme_minimal(base_size = 14.5) +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    plot.title = element_text(face = "bold", size = 16),
+    axis.text.x = element_text(angle = 45, hjust = 1), # Tilts the x-axis labels by 45 degrees to be more readable.
+    plot.title = element_text(size = 14.5, face = "bold"),
     plot.subtitle = element_text(size = 12)) +
-  geom_smooth(aes(group = 1), method = "loess", se = FALSE, linetype = "dashed", color = "black")
+  geom_smooth(method = "loess", se = FALSE, linetype = "dashed", color = "black") + # Method = "loess" smooths data using local regression, which essentially means it creates a curved line around the data points.
+  facet_grid(year ~ ., scales = "free_y") + # Facets the graph by each year. Scales = "free_y" means that the y-axis for each graph do not have to follow the same scale. This way, the scale for each graph will better fit their respective data.
+theme(panel.spacing = unit(1.5, "lines")) + # Creates spacing between each of the faceted plots.
+  scale_y_continuous(breaks = my_breaks) # Function that sets total number of labels on y-axis per graph to 3.
 ```
 
-It can be hypothesised that during the winter months there could be a peak due to the colder, dryer air, however, patients may be less inclined to be outdoors for prolonged periods of time. During the spring months when allergies begin to spike, not only could the allergies worsen symptoms, but patients could begin spending more time outdoors. Moving into summer, patients will likely be spending the most time exposed to the outdoors, with the most sunlight exposure and warmest weather. Finally in Autumn, there will be less time spent outdoors as temperatures drop again.
+The trend lines over 3 years do not show any discernible pattern. Prescriptions were broadly constant over 2022. They rose slightly over spring and summer in 2023, and fell throughout the year in 2024. The results do not indicate that prescriptions vary by season.
 
-Of course there are limitations in what can be observed from this graph and it is difficult to truly draw conclusions on why this seasonal variation is happening. There are geographical variations across Scotland geographically, with regions experiencing different climates and exposures which is difficult to determine from this data. Further research into seasonal behavioural trends related to outdoor exposure and DED in Scotland could reveal interesting patterns to better explain these variations.
+There are some limitations. Actual weather conditions are not used, and weather may vary within seasons and from year to year. There may be regional variations in climate and differences between urban and rural locations. For the next steps, further studies could compare prescription volumes with actual temperature and weather patterns.
 
 ## Rurality
 
-To try and answer this question of how geographical variations in Scotland can affect DED, examining further than just seasonality can be particularly useful. It is established that air pollution and outdoor exposure are risk factors of DED (vidal-rohr), and whether a patient lives in a rural or urban setting could have significant implications on their exposures to these risk factors, and therefore, whether they develop it. It is key for prescribers to understand the demographics of different geographical areas as trends seen in patients could largely vary across Scotland.
+Air pollution and outdoor activity have been correlated with DED [@vidal-rohra2023]. In addition, it is postulated that proximity to urban centres may improve access to prescriptions. As these factors may correspond to rural and urban settings, this study looks at the impact of urban and rural location on prescriptions.
 
-The 2 raw data are sourced from Public Health Scotland from GP Practice List Page January 2025 (in order to ensure all practices are included in 2024.) and the Urban Rural 2020 Fold, which are then joined together.
-
-```{r}
-gp_details <- read_csv("data/gp_details/0d2e258a-1451-4af1-a7e5-e8327994fa55.csv") %>%
-  select(PracticeCode, DataZone, PracticeListSize) %>%
-  clean_names()
-
-urban_rural <- read_csv("data/urban_rural/c8bd76cd-6613-4dd7-8a28-6c99a16dc678.csv") %>%
-  select(DataZone, UrbanRural6fold2020) %>%
-  clean_names()
-
-gp_rurality <- inner_join(gp_details, urban_rural, by = "data_zone")
-```
-
-From the DED prescriptions data, the prescriptions are stratified by GP Practice to determine the total number of DED items prescribed by each practice. This can then be joined with the GP and rurality data to determine the number of DED prescriptions in each GP practice and what fold their rurality is in the Urban Rural 6 Fold 2020. Finally, once stratified by Urban Rural Fold, the practice population of each fold, how many DED items were prescribed, and the number of items prescribed per person can be determined and visually displayed as a table.
+To measure this, the volumes of prescriptions from all GP practices was sorted by the categories in the Urban Rural Classification 2020. Then each category was divided by the respective total number of registered patients. This was calculated for 3 separate years.
 
 ```{r}
-ded_prescriptions_by_gp <- ded_prescriptions %>%
-  group_by(gp_practice) %>%
+# The GP Practice Contact Details and List Sizes dataset provides the data zone for each practice. The Urban Rural Classification 2020 assigns rurality by data zones. Therefore, joining by data_zone allows the rurality of each practice to then be determined.
+gp_rurality_classified <- inner_join(gp_details, urban_rural_classification, by = "data_zone") %>%
+  select(practice_code, urban_rural8fold2020)
+
+# Yearly prescriptions of DED are calculated.
+ded_yearly_summary <- ded_prescriptions %>%
+  mutate(year = paid_date_month %/% 100) %>%
+  group_by(year, gp_practice) %>%
   summarise(total_paid_quantity = sum(paid_quantity, na.rm = TRUE))
 
-ded_prescriptions_rurality <- full_join(ded_prescriptions_by_gp, gp_rurality, by = c("gp_practice" = "practice_code")) %>%
-  filter(!is.na(urban_rural6fold2020)) %>%
-  group_by(urban_rural6fold2020) %>%
-  summarise(total_paid_quantity = sum(total_paid_quantity, na.rm = TRUE), total_practice_list_size = sum(practice_list_size, na.rm = TRUE)) %>%
-  mutate(proportion_quantity = total_paid_quantity / total_practice_list_size, itemsperperson = total_paid_quantity / total_practice_list_size, urban_rural6fold2020 = factor(urban_rural6fold2020, levels = 1:6, labels = c("Large Urban Areas [1]", "Other Urban Areas [2]", "Accessible Small Towns [3]", "Remote Small Towns [4]", "Accessible Rural [5]", "Remote Rural [6]")))
+# Practice sizes for each year are calculated for each GP practice.
+gp_yearly_populations <- gp_populations %>%
+  mutate(year = (date %/% 10000)-1) %>%
+  filter(sex == "All") %>%
+  group_by(year, practice_code) %>%
+  summarise(total_all_ages = sum(all_ages, na.rm = TRUE))
 
-ded_prescriptions_rurality %>%
-  select(urbanrural = urban_rural6fold2020, total_items = total_paid_quantity, total_population = total_practice_list_size, itemsperperson) %>%
-  gt() %>%
-  tab_header(
-    title = md("**Dry Eye Medication Prescribing by Urban–Rural Classification**"),
-    subtitle = "Standardised by practice list size, Scotland (2024)") %>%
+# These datasets are joined to later show the number of DED prescriptions each year by GP practice.
+ded_by_population_yearly <- full_join(ded_yearly_summary, gp_yearly_populations, by = c("gp_practice" = "practice_code", "year" = "year"), relationship =
+  "many-to-many")
+
+# Calculates the total paid quantity, the total practice population, and paid quantity per person for each of the 8 categories in the Urban Rural Classification 2020 8 fold.
+ded_rurality_summary <- full_join(ded_by_population_yearly, gp_rurality_classified, by = c("gp_practice" = "practice_code"), relationship =
+  "many-to-many") %>%
+  filter(!is.na(urban_rural8fold2020)) %>% # Any missing data is cleared.
+  group_by(year, urban_rural8fold2020) %>%
+  summarise(total_paid_quantity = sum(total_paid_quantity, na.rm = TRUE), 
+  total_all_ages = sum(total_all_ages, na.rm = TRUE)) %>%
+  mutate(itemsperperson = total_paid_quantity / total_all_ages, urban_rural8fold2020 = factor(urban_rural8fold2020, levels = 1:8, labels = c("Large Urban Areas [1]", "Other Urban Areas [2]", "Accessible Small Towns [3]", "Remote Small Towns [4]", "Very Remote Small Towns [5]", "Accessible Rural Areas [6]", "Remote Rural Areas [7]", "Very Remote Rural Areas [8]"))) %>% # Each of the classifications are given their corresponding name.
+  select(year, urban_rural8fold2020, itemsperperson) %>%
+  pivot_wider(names_from = year, values_from = itemsperperson) # Converts the data from long to wide format so that each year becomes its own column with the corresponding items per person.
+
+# Creates a table with a heatmap effect that includes paid quantity per person by Urban Rural Classification from 2022-2024.
+ded_rurality_summary %>%
+  gt(rowname_col = "urban_rural8fold2020") %>% # Rows are set to each of the 8 classifications.
+  tab_header(title = md("**DED Prescribing by Urban Rural Classification (2024)**")) %>%
   fmt_number(
-    columns = c(total_items, total_population),
-    decimals = 0,
-    use_seps = TRUE) %>%
-  fmt_number(
-    columns = itemsperperson,
+    columns = c(`2022`, `2023`, `2024`), # This sets the columns as 2022, 2023 and 2024.
     decimals = 3) %>%
-  cols_label(
-    urbanrural = "Urban/Rural Category",
-    total_items = "Total DED Items Prescribed",
-    total_population = "Total Practice Population",
-    itemsperperson = "Items per Person") %>%
+  tab_spanner(
+  label = "Paid Quantity per Person",
+  columns = c(`2022`, `2023`, `2024`)) %>% # Above the columns 2022, 2023 and 2024, the spanner 'Paid Quantity per Person' is added.
+  tab_style( # This is where the stylisation start.
+    style = cell_text(align = "center", weight = "bold"), # Spanner text is made bold and centred.
+    locations = cells_column_spanners(spanners = "Paid Quantity per Person")
+  ) %>%
   tab_style(
-    style = list(cell_text(weight = "bold")), locations = cells_title(groups = "title")) %>%
+    style = cell_text(align = "center"), # Contents are centred.
+    locations = cells_body(columns = everything())
+  ) %>%
   tab_style(
-    style = cell_borders(sides = "bottom", color = "black", weight = px(2)),
-    locations = cells_column_labels()) %>%
+    style = cell_text(align = "center", weight = "bold"),
+    locations = cells_column_labels(columns = everything()) # This centres all the column labels and makes them bold.
+  ) %>%
+  tab_style(
+    style = list(cell_text(weight = "bold")), locations = cells_title(groups = "title")) %>% # Makes title bold.
+  tab_style(
+    style = cell_borders(sides = "bottom", color = "black", weight = px(2)), locations = cells_column_labels()) %>% # This creates an underline border at the column labels to create a visible division with the table contents.
   tab_options(
-    table.font.size = 14,
-    column_labels.background.color = "#f0f0f0",
-    data_row.padding = px(6),
-    table.border.top.color = "white",
-    table.border.bottom.color = "white",
-    heading.title.font.size = 20,
-    heading.subtitle.font.size = 14)
+    table.width = pct(100), # Scales the width of the table to fit the whole screen, otherwise the table stays too thin.
+    table.font.size = 14.5,
+    heading.title.font.size = 16,
+    heading.subtitle.font.size = 14.5,
+    column_labels.background.color = "lightgray") %>% # Makes the column label background darker, which in combination with the black underline border, helps the table have better contrast.
+  data_color(
+    columns = c(`2022`, `2023`, `2024`),
+    colors = scales::col_numeric(
+      palette = c("lightyellow", "orange", "brown1"), # This creates a heatmap effect on the table using a colour scale based on paid quantity per person.
+      domain = NULL))
 ```
 
-The results of the table are interesting, it may have been expected that urban areas may result in greater numbers of prescriptions per person due to air pollution, however the impact of this may be limited due to Scotland having less of a pollution problem than other cities worldwide, meaning the relative difference between urban and rural is not significant enough to impact this. It would also be expected that in urban areas there could potentially be better access to healthcare resources, resulting in greater prescriptions per person, however, this is not observed. The prescriptions per person in smaller towns or rural areas being on average higher than urban areas (3.2 \> 2.7) supports the narrative that outdoor exposure is a significant risk factor for DED as these patients may have better access to outdoor activities resulting in greater time spent exposed outdoors.
+In all 3 years the lowest average dosage per person is in Large Urban Areas and the highest is in Remote Small Towns, while the second highest is Very Remote Small Towns. This would indicate that prescription levels are higher in Small Towns, however Accessible Small Towns do not fit this trend. The other results show inconsistent patterns. All the prescriptions decline slightly over the 3-year period. Remote Rural and Very Remote Rural Areas decline noticeably over the 3-year period.
 
-## Demographics
+Accessible Small Towns and Urban Areas would be expected to have easier access to medical care and higher pollution, however they show lower prescription levels. Rural areas might be expected to have lower prescriptions and cleaner air, but the prescription levels are inconsistent. However, the pattern is not entirely random as the highest and lowest areas are consistent over three years. This suggests that there may be other factors influencing the results.
 
-While geographical location and climate play key roles in the exposure of significant risk factors, specific demographics have also been shown to play key a role in the prevelance of DED across Scotland. In particular, sex and age (Hossain). It has been shown there are male-specific sex hormones which help regulate both tear lipid and aqueous secretions, as well as the immune responses of corneal and conjunctival cells. Whereas in females, these specific sex hormones antagonise these functions. As a result, females are shown to be 2.4 times more significantly likely to experience DED than males (vidal-rohr). Moreover, the majority of individuals with DED are aged \>50 years (Hossain), and as Scotland has an aging population, the effects of this can be profound.
+This study is limited to only 3 years. A more extensive study might reveal more distinct trends. A finer breakdown of categories may also reveal more significant trends. The next steps would be to extend the timescale of the data, for 5 or 10 years, and to use more categories for the urban rural classification.
 
-The data is sourced from the practice populations information from Public Health Scotland.
+## Sex
 
-```{r}
-practice_populations <- read_csv("data/practice_populations/ce967fa9-0f7f-4389-9f19-4958c45e43c2.csv") %>%
-  clean_names()
-```
-
-### Sex
-
-Using the DED prescription data, it is filtered for only the items prescribed in 2024 in order to better represent the average number of prescriptions per person from the current 2025 January practice data. The practice population is then stratified by sex and GP practice and then transformed from long format to wide format using pivot_wider(). By transforming, the Male and Female sex can become columns and allows for the number of patients of each sex in each GP practice to be compared. A ratio can then be calculated for the female to male ratio in each GP practice, which can be used as the x-axis for a plot. This dataframe can then be joined to the DED prescription data for 2024, in order to determine the number of DED items prescribed per patient of each GP practice. When plotted on a graph, a log scale can be used which prevents extremes that might stretch the plot and makes the trends more easy to see. What can then be observed is how the ratio of female-to-male in a gp practice may impact the number of DED prescriptions per person.
+Research has shown that females are more likely to suffer from DED than males [@hossain2021] [@vidal-rohra2023]. To explore this trend, the study compared the ratio of female to male patients in each GP practice with the average volume of prescriptions per person for the same practice in 2024. A log scale was used to prevent extremes that might stretch the plot, which makes the trends easier to see.
 
 ```{r}
+# DED prescriptions are calculated by GP practice in 2024.
 ded_by_gp_2024 <- ded_prescriptions %>%
   filter(str_starts(as.character(paid_date_month), "2024")) %>%
   group_by(gp_practice) %>%
   summarise(total_paid_quantity = sum(paid_quantity, na.rm = TRUE))
 
-sex_population <- practice_populations %>%
-    group_by(sex, practice_code) %>%
+# A new dataset is created which contains only GP population data from 2024.
+gp_populations_2024 <- gp_populations %>%
+  filter(str_starts(as.character(date), "2024"))
+
+# Calculates the female to male ratio of each practice by dividing the total female population by the total male population.
+gp_sex_ratio_2024 <- gp_populations_2024 %>%
+    group_by(sex, practice_code, date) %>%
     summarise(total_all_ages = sum(all_ages, na.rm = TRUE)) %>%
-    pivot_wider(names_from = sex, values_from = total_all_ages) %>%
+    pivot_wider(names_from = sex, values_from = total_all_ages) %>% # Transforms data from a long to a wide dataset, making Female and Male into columns with the corresponding number of patients.
     mutate(female_to_male_ratio = Female / Male) %>%
     filter(!is.na(female_to_male_ratio))
 
-ded_per_sex_gp_2024 <- inner_join(ded_by_gp_2024, sex_population, by = c("gp_practice" = "practice_code")) %>%
+# Joins the total paid quantity of each practice in 2024 dataset with the sex ratio by gp dataset. Then it calculates the average paid quantity per person for each practice.
+ded_by_sex_ratio_2024 <- inner_join(ded_by_gp_2024, gp_sex_ratio_2024, by = c("gp_practice" = "practice_code")) %>%
   mutate(rate_per_person = total_paid_quantity / All)
 
-ggplot(ded_per_sex_gp_2024, aes(x = female_to_male_ratio, y = rate_per_person, size = All)) +
-  geom_point(color = "pink1", alpha = 0.7) +
-  geom_smooth(method = "lm", se = TRUE, color = "black", linetype = "dashed", linewidth = 1) +
-  scale_x_log10(labels = scales::comma_format(accuracy = 0.01)) +  # Prevents extreme ratios from stretching the plot and makes trends easier to see.
-  scale_y_continuous(labels = scales::comma_format(accuracy = 0.01)) +
-  scale_size_continuous(name = "Practice Population", range = c(2, 8)) +
-  labs(
-    title = "Effect of Female-to-Male Ratio on DED Prescription Rate (2024)",
-    subtitle = "Each point represents a GP practice",
-    x = "Female-to-Male Ratio (log scale)",
-    y = "DED Items per Person",
-    caption = "Source: Scottish GP prescribing data"
+# Plots the ratio of female to male patients in each GP practice with the paid quantity per person of each practice. 
+(ggplot(ded_by_sex_ratio_2024, aes(x = female_to_male_ratio, y = rate_per_person, size = All, color = All)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", linetype = "dashed", color = "black", inherit.aes = FALSE, # Standard error is left on.
+  aes(x = female_to_male_ratio, y = rate_per_person)) + # The aesthetic from ggplot are not inherited and instead regression is only based on these variables. If this is not done, it will try and interpret size and colour as part of the regression, resulting in errors.
+  scale_x_log10(labels = scales::comma_format(accuracy = 0.01)) +  # This creates a logarithmic scale, which prevents extreme ratios from stretching the plot and makes trends easier to see.
+  scale_y_continuous(labels = scales::comma_format(accuracy = 0.01)) + # Keeps the y-axis to 2 decimal points for consistency.
+  scale_size_continuous(range = c(2, 8), guide = "none") + # Scales points proportionally to practice population size. Smallest size is 2 and largest is 8. The legend is also removed so that only the colour scale appears.
+  scale_color_gradient(low = "yellow", high = "brown1", name = "Practice Population") + # Creates a colour gradient based on practice population size and adds a colour scale.
+  labs(x = "Female-to-Male Ratio (log scale)",
+    y = "Paid Quantity per Person",
+    title = "Effect of Female-to-Male Ratio on DED Prescription Rate (2024)"
   ) +
-  theme_minimal(base_size = 14) +
+  theme_minimal(base_size = 14.5) +
   theme(
-    plot.title = element_text(face = "bold", size = 16),
-    plot.subtitle = element_text(size = 12),
-    legend.position = "bottom"
-  )
+    plot.title = element_text(size = 14.5, face = "bold"),
+    plot.subtitle = element_text(size = 12))) %>%
+  ggplotly() # Makes the graph interactive.
 ```
 
-What can be observed is a slight positive relationship. As the ratio of female to male increases in GP practices, there is an increase in the prescription of DED items across GP practices, supporting the evidence that females are more likely to have DED.
+The results show a positive relationship. As the ratio of female to male increases in GP practices, there is an increase in the prescription of DED items across GP practices, consistent with previous research.
 
-### Age
+One limitation is this only looks at the total number of prescriptions in proportion to the number of females and males in each practice and does not show actual prescriptions by sex, which does not guarantee that it is the females who are being prescribed the DED. The next step would be to get data on the actual prescriptions by sex.
 
-From the practice populations data, there is a new column added for the weighted mean age for each GP practice, which is calculated by taking the center number of each age group and multiplying each row by that number, then dividing by total number. This data can then be joined to the DED prescription data for 2024, and then the number of DED prescriptions per person can be calculated for each GP practice, with the x-axis as the weighted mean age for each GP practice.
+## Age
+
+Studies show that prevalence of DED increases with age, with the majority of sufferers aged over 50 [@hossain2021]. To explore this trend, this study calculated weighted average ages for each GP practice. This was done because the data is provided in age groups and using a weighted average allows it to be plotted in a continuous line. These weighted averages were then compared with the total volume of prescriptions per person of each practice.
 
 ```{r}
-practice_pop_normalised <- practice_populations %>%
+# Calculates weighted average ages for each GP practice.
+gp_population_normalised <- gp_populations_2024 %>%
   rowwise() %>% # Performs each row independently
-  mutate(weighted_age = (ages0to4*2.5 + ages5to14*10 + ages15to24*20 + ages25to44*34.5 + ages45to64*54.5 + ages65to74*69.5 + ages75to84*79.5 + ages85plus*90) / all_ages)
+  mutate(weighted_age = (ages0to4*2.5 + ages5to14*10 + ages15to24*20 + ages25to44*34.5 + ages45to64*54.5 + ages65to74*69.5 + ages75to84*79.5 + ages85plus*90) / all_ages) # Weighted age is calculated by taking the middle number in each age group and multiplying that by the number of people in each age group, then dividing by the total ages.
 
-joined_gp_ded <- inner_join(ded_by_gp_2024, practice_pop_normalised, by = c("gp_practice" = "practice_code")) %>%
+# Paid quantity by person is calculated for each GP practice by joining with the 2024 DED prescriptions by practice dataset.
+ded_by_normalised_population <- inner_join(ded_by_gp_2024, gp_population_normalised, by = c("gp_practice" = "practice_code")) %>%
   filter(sex == "All") %>%
   mutate(rate_per_person = total_paid_quantity / all_ages) %>%
     filter(!is.na(weighted_age))
-```
 
-```{r}
-ggplot(joined_gp_ded, aes(x = weighted_age, y = rate_per_person, size = all_ages)) +
-  geom_point(color = "brown1", alpha = 0.7) +
-  geom_smooth(method = "lm", se = TRUE, color = "black", linetype = "dashed", linewidth = 1) +
-  scale_x_continuous(labels = scales::comma_format(accuracy = 0.1)) +
-  scale_y_continuous(labels = scales::comma_format(accuracy = 0.01)) +
-  scale_size_continuous(name = "Practice Population", range = c(2, 8)) +
-  labs(
-    title = "Effect of Weighted Mean Age on DED Prescription Rate (2024)",
-    subtitle = "Each point represents a GP practice",
-    x = "Weighted Mean Age of Practice Population",
-    y = "DED Items per Person",
-    caption = "Source: Scottish GP prescribing data"
-  ) +
-  theme_minimal(base_size = 14) +
+# Weighted averages are plotted against the paid quantity per person of each practice.
+(ggplot(ded_by_normalised_population, aes(x = weighted_age, y = rate_per_person, size = all_ages, color = all_ages)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", linetype = "dashed", color = "black", inherit.aes = FALSE, # Standard error is left on.
+  aes(x = weighted_age, y = rate_per_person)) + # Same reasoning as the previous graph, we do not want the linear model to inherit the size and colour aesthetics, otherwise there will be errors.
+  scale_x_continuous(labels = scales::comma_format(accuracy = 0.01)) +
+  scale_y_continuous(labels = scales::comma_format(accuracy = 0.01)) + # Keeps X and Y-axis consistent to 2 decimal points.
+  scale_size_continuous(range = c(2, 8), guide = "none") + # A scaling size by practice population is also given for this graph, and the legend removed.
+  scale_color_gradient(low = "yellow", high = "brown1", name = "Practice Population") + # Again, a colour gradient based on practice sizes and a colour scale is added.
+  labs(x = "Weighted Mean Age of Practice Population",
+    y = "Paid Quantity per Person",
+    title = "Weighted Mean Age on DED Prescription Rate (2024)")+
+  theme_minimal(base_size = 14.5) +
   theme(
-    plot.title = element_text(face = "bold", size = 16),
-    plot.subtitle = element_text(size = 12),
-    legend.position = "bottom"
-  )
+    plot.title = element_text(size = 14.5, face = "bold"),
+    plot.subtitle = element_text(size = 12))) %>%
+  ggplotly() # Graph is made to be interactive.
 ```
 
-As expected, there is a positive relationship between weighted mean age and prescription of DED items per person.
+The results indicated a positive relationship between weighted mean age and prescription of DED items per person. This supports the existing research.
+
+One limitation is that this plot uses the total number of prescriptions of each GP practice in proportion to the weighted mean age. It is not actual prescription per patient data, but a prediction. The next steps would be to gather the prescription data from a sample of actual patients and look for trends.
 
 # Conclusion
 
-Dry eye disease is a prevalent and debilitating condition costing millions in healthcare worldwide with significant burden on the quality of life of patients. As dry eye disease is a chronic condition with numerous risk factors depending on the patient’s background, lifestyle and environment, the experience and perception of patients can vary widely between individuals.
+This study has considered whether seasonal variation, rurality, sex and age affect DED prescriptions in Scotland. The results suggest possible positive correlations with sex and age, which is consistent with previous research. Seasonal variation did not appear to be a risk factor, and the results of the rurality study indicated some patterns, but not as expected. The study revealed that total prescriptions have declined over the 3-year period of the study. The reasons for this decline need to be investigated. Further research with more detailed data and longer timescales may give more conclusive results.
 
-Better understanding of the seasonal trends of DED in Scotland,
-
-More in-depth research into potential differences in dry eye phenotypes as well as awareness of this condition between different age groups, would be highly relevant to inform clinical management and effective patient communication; this should include the paediatric population for which dry eye disease is also becoming increasingly common. (Chiang)
+# References
