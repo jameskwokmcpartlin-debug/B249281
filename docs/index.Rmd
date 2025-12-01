@@ -150,27 +150,27 @@ gp_yearly_populations <- gp_populations %>%
   group_by(year, practice_code) %>%
   summarise(total_all_ages = sum(all_ages, na.rm = TRUE))
 
-# These datasets are joined to later show the number of DED prescriptions each year by GP practice.
+# These datasets are joined and show the number of DED prescriptions by GP practice each year.
 ded_by_population_yearly <- full_join(ded_yearly_summary, gp_yearly_populations, by = c("gp_practice" = "practice_code", "year" = "year"), relationship =
   "many-to-many")
 
-# Calculates the total paid quantity, the total practice population, and paid quantity per person for each of the 8 categories in the Urban Rural Classification 2020 8 fold.
+# For each year, this calculates the total paid quantity, the total practice population, and paid quantity per person for the 8 categories in the Urban Rural Classification.
 ded_rurality_summary <- full_join(ded_by_population_yearly, gp_rurality_classified, by = c("gp_practice" = "practice_code"), relationship =
   "many-to-many") %>%
   filter(!is.na(urban_rural8fold2020)) %>% # Any missing data is cleared.
   group_by(year, urban_rural8fold2020) %>%
   summarise(total_paid_quantity = sum(total_paid_quantity, na.rm = TRUE), 
   total_all_ages = sum(total_all_ages, na.rm = TRUE)) %>%
-  mutate(itemsperperson = total_paid_quantity / total_all_ages, urban_rural8fold2020 = factor(urban_rural8fold2020, levels = 1:8, labels = c("Large Urban Areas [1]", "Other Urban Areas [2]", "Accessible Small Towns [3]", "Remote Small Towns [4]", "Very Remote Small Towns [5]", "Accessible Rural Areas [6]", "Remote Rural Areas [7]", "Very Remote Rural Areas [8]"))) %>% # Each of the classifications are given their corresponding name.
-  select(year, urban_rural8fold2020, itemsperperson) %>%
-  pivot_wider(names_from = year, values_from = itemsperperson) # Converts the data from long to wide format so that each year becomes its own column with the corresponding items per person.
+  mutate(paid_quantity_perperson = total_paid_quantity / total_all_ages, urban_rural8fold2020 = factor(urban_rural8fold2020, levels = 1:8, labels = c("Large Urban Areas [1]", "Other Urban Areas [2]", "Accessible Small Towns [3]", "Remote Small Towns [4]", "Very Remote Small Towns [5]", "Accessible Rural Areas [6]", "Remote Rural Areas [7]", "Very Remote Rural Areas [8]"))) %>% # Each of the classifications are given their corresponding name.
+  select(year, urban_rural8fold2020, paid_quantity_perperson) %>%
+  pivot_wider(names_from = year, values_from = paid_quantity_perperson) # Converts the data from long to wide format so that each year becomes its own column with the corresponding paid quantity per person.
 
 # Creates a table with a heatmap effect that includes paid quantity per person by Urban Rural Classification from 2022-2024.
 ded_rurality_summary %>%
-  gt(rowname_col = "urban_rural8fold2020") %>% # Rows are set to each of the 8 classifications.
+  gt(rowname_col = "urban_rural8fold2020") %>% # Row names are set to each of the 8 classifications.
   tab_header(title = md("**DED Prescribing by Urban Rural Classification (2024)**")) %>%
   fmt_number(
-    columns = c(`2022`, `2023`, `2024`), # This sets the columns as 2022, 2023 and 2024.
+    columns = c(`2022`, `2023`, `2024`), # This sets the columns to 2022, 2023 and 2024.
     decimals = 3) %>%
   tab_spanner(
   label = "Paid Quantity per Person",
@@ -242,10 +242,10 @@ ded_by_sex_ratio_2024 <- inner_join(ded_by_gp_2024, gp_sex_ratio_2024, by = c("g
   geom_point(alpha = 0.7) +
   geom_smooth(method = "lm", linetype = "dashed", color = "black", inherit.aes = FALSE, # Standard error is left on.
   aes(x = female_to_male_ratio, y = rate_per_person)) + # The aesthetic from ggplot are not inherited and instead regression is only based on these variables. If this is not done, it will try and interpret size and colour as part of the regression, resulting in errors.
-  scale_x_log10(labels = scales::comma_format(accuracy = 0.01)) +  # This creates a logarithmic scale, which prevents extreme ratios from stretching the plot and makes trends easier to see.
-  scale_y_continuous(labels = scales::comma_format(accuracy = 0.01)) + # Keeps the y-axis to 2 decimal points for consistency.
+  scale_x_log10(labels = scales::comma_format(accuracy = 0.01)) +  # This creates a logarithmic scale, which prevents extreme ratios from stretching the plot and makes trends easier to see. Also sets x-axis to 2 decimal points for a cleaner look.
+  scale_y_continuous(labels = scales::comma_format(accuracy = 0.01)) + # Sets the y-axis to 2 decimal points for consistency.
   scale_size_continuous(range = c(2, 8), guide = "none") + # Scales points proportionally to practice population size. Smallest size is 2 and largest is 8. The legend is also removed so that only the colour scale appears.
-  scale_color_gradient(low = "yellow", high = "brown1", name = "Practice Population") + # Creates a colour gradient based on practice population size and adds a colour scale.
+  scale_color_gradient(low = "yellow", high = "brown1", name = "Practice Population") + # Creates a colour gradient to points based on practice population size and adds a colour scale.
   labs(x = "Female-to-Male Ratio (log scale)",
     y = "Paid Quantity per Person",
     title = "Effect of Female-to-Male Ratio on DED Prescription Rate (2024)"
@@ -277,16 +277,16 @@ ded_by_normalised_population <- inner_join(ded_by_gp_2024, gp_population_normali
   mutate(rate_per_person = total_paid_quantity / all_ages) %>%
     filter(!is.na(weighted_age))
 
-# Weighted averages are plotted against the paid quantity per person of each practice.
+# Weighted averages are plotted against the paid quantity per person of each practice. Again, a log scale is used.
 (ggplot(ded_by_normalised_population, aes(x = weighted_age, y = rate_per_person, size = all_ages, color = all_ages)) +
   geom_point(alpha = 0.7) +
   geom_smooth(method = "lm", linetype = "dashed", color = "black", inherit.aes = FALSE, # Standard error is left on.
   aes(x = weighted_age, y = rate_per_person)) + # Same reasoning as the previous graph, we do not want the linear model to inherit the size and colour aesthetics, otherwise there will be errors.
-  scale_x_continuous(labels = scales::comma_format(accuracy = 0.01)) +
-  scale_y_continuous(labels = scales::comma_format(accuracy = 0.01)) + # Keeps X and Y-axis consistent to 2 decimal points.
+  scale_x_log10(labels = scales::comma_format(accuracy = 0.01)) + # Again, uses a log scale and sets the x-axis to 2 decimal points.
+  scale_y_continuous(labels = scales::comma_format(accuracy = 0.01)) + # Keeps Y-axis consistent to 2 decimal points.
   scale_size_continuous(range = c(2, 8), guide = "none") + # A scaling size by practice population is also given for this graph, and the legend removed.
-  scale_color_gradient(low = "yellow", high = "brown1", name = "Practice Population") + # Again, a colour gradient based on practice sizes and a colour scale is added.
-  labs(x = "Weighted Mean Age of Practice Population",
+  scale_color_gradient(low = "yellow", high = "brown1", name = "Practice Population") + # A colour gradient based on practice sizes and a colour scale is added.
+  labs(x = "Weighted Mean Age of Practice Population (log scale)",
     y = "Paid Quantity per Person",
     title = "Weighted Mean Age on DED Prescription Rate (2024)")+
   theme_minimal(base_size = 14.5) +
