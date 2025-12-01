@@ -97,7 +97,7 @@ ded_seasonal_summary <- ded_prescriptions %>%
            month %in% c(12, 1, 2) ~ "Winter"), # Here, the months are assigned to their corresponding season. 
          season = factor(season, levels = c("Winter", "Spring", "Summer", "Autumn"))) # Seasons are set to appear in the correct order at the side of the graph.
 
-my_breaks <- function(x) pretty(x, n = 3) # This function is used in the ggplot to set the total number of breaks of each graph (the amount of labels on the y-axis) to 3, so that the plot is less messy.
+my_breaks <- function(x) pretty(x, n = 3) # Sets the total number of breaks of each graph (the amount of labels on the y-axis) to 3, so that the plot is less messy.
 
 # Plots the total paid quantity by month, groups to 1 to ensure 1 continuous line, colours by season, draws a curved line, and facets by year.
 ggplot(ded_seasonal_summary, aes(x = month_name, y = total_paid_quantity, group = 1, color = season)) +
@@ -144,7 +144,7 @@ ded_yearly_summary <- ded_prescriptions %>%
 
 # Practice sizes for each year are calculated for each practice.
 gp_yearly_populations <- gp_populations %>%
-  mutate(year = (date %/% 10000)-1) %>% # The choice was made to use population data from January of the next year to represent the entire year more accurately. Therefore 1 must be subtracted.
+  mutate(year = (date %/% 10000)-1) %>% # The choice was made to use population data from January of the next year to represent the entire year more accurately. Therefore 1 must be subtracted from the year.
   filter(sex == "All") %>%
   group_by(year, practice_code) %>%
   summarise(total_all_ages = sum(all_ages, na.rm = TRUE))
@@ -184,7 +184,7 @@ ded_rurality_summary %>%
   ) %>%
   tab_style(
     style = cell_text(align = "center", weight = "bold"),
-    locations = cells_column_labels(columns = everything()) # This centres all the column labels and makes them bold.
+    locations = cells_column_labels(columns = everything()) # Centres all the column labels and makes them bold.
   ) %>%
   tab_style(
     style = list(cell_text(weight = "bold")), locations = cells_title(groups = "title")) %>% # Makes title bold.
