@@ -262,7 +262,7 @@ One limitation is this only looks at the total number of prescriptions in propor
 
 ## Age
 
-Studies show that prevalence of DED increases with age [@hossain2021]. To explore this trend, this study calculated weighted mean age for each GP practice. This was done because the data is provided in age groups and using a weighted mean allows it to be plotted in a continuous line. These weighted means were then compared with the total volume of prescriptions per person of each practice. A log scale was used to prevent extremes that might stretch the plot.
+Studies show that prevalence of DED increases with age [@hossain2021]. To explore this trend, this study calculated weighted mean age for each GP practice in 2024. This was done because the data is provided in age groups and using a weighted mean allows it to be plotted in a continuous line. These weighted means were then compared with the total volume of prescriptions per person of each practice. A log scale was used to prevent extremes that might stretch the plot.
 
 ```{r}
 # Calculates weighted mean ages for each GP practice.
