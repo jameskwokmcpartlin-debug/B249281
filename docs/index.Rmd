@@ -22,12 +22,12 @@ Dry eye disease (DED) is a widespread, debilitating ocular condition that costs 
 
 The study uses the following data from PHS:
 
--   Data by Prescriber Location from January 2022 to December 2024: <https://www.opendata.nhs.scot/dataset/prescriptions-in-the-community>
--   GP Practice Population Demographics January 2023, 2024 & 2025: <https://www.opendata.nhs.scot/dataset/gp-practice-populations>
--   GP Practice Contact Details and List Sizes January 2025: <https://www.opendata.nhs.scot/dataset/gp-practice-contact-details-and-list-sizes>
--   Data Zone (2011) Urban Rural Classification 2020: <https://www.opendata.nhs.scot/dataset/urban-rural-classification>
+-   [Data by Prescriber Location (2022–2024)](https://www.opendata.nhs.scot/dataset/prescriptions-in-the-community)
+-   [GP Practice Population Demographics (2023–2025)](https://www.opendata.nhs.scot/dataset/gp-practice-populations)
+-   [GP Practice Contact Details and List Sizes (2025)](https://www.opendata.nhs.scot/dataset/gp-practice-contact-details-and-list-sizes)
+-   [Data Zone (2011) Urban Rural Classification 2020](https://www.opendata.nhs.scot/dataset/urban-rural-classification)
 
-In the Data by Prescriber Location data set, the data selected was classified as ‘Tear deficiency, eye lubricant and astringent’ using the BNF item code (which can be determined in this table: <https://opendata.nhsbsa.net/dataset/bnf-code-information-current-year>).
+In the Data by Prescriber Location data set, the data selected was classified as ‘Tear deficiency, eye lubricant and astringent’ using the [BNF Code Information table](https://opendata.nhsbsa.net/dataset/bnf-code-information-current-year).
 
 The study uses paid_quantity to measure volume of prescriptions. According to PHS, this is defined as: "the number of doses or uses within a single item, rather than the quantity of the item itself."
 
@@ -94,8 +94,8 @@ ded_seasonal_summary <- ded_prescriptions %>%
            month %in% c(3, 4, 5)  ~ "Spring",
            month %in% c(6, 7, 8)  ~ "Summer",
            month %in% c(9, 10, 11) ~ "Autumn",
-           month %in% c(12, 1, 2) ~ "Winter"),
-         season = factor(season, levels = c("Winter", "Spring", "Summer", "Autumn"))) # Here, the months are assigned to their corresponding season, then set to appear in the correct order at the side of the graph.
+           month %in% c(12, 1, 2) ~ "Winter"), # Here, the months are assigned to their corresponding season. 
+         season = factor(season, levels = c("Winter", "Spring", "Summer", "Autumn"))) # Seasons are set to appear in the correct order at the side of the graph.
 
 my_breaks <- function(x) pretty(x, n = 3) # This function is used in the ggplot to set the total number of breaks of each graph (the amount of labels on the y-axis) to 3, so that the plot is less messy.
 
@@ -129,27 +129,27 @@ There are some limitations. Actual weather conditions are not used, and weather 
 
 Air pollution and outdoor activity have been correlated with DED [@vidal-rohra2023]. In addition, it is postulated that proximity to urban centres may improve access to prescriptions. As these factors may correspond to rural and urban settings, this study looks at the impact of urban and rural location on prescriptions.
 
-To measure this, the volumes of prescriptions from all GP practices was sorted by the categories in the Urban Rural Classification 2020. Then each category was divided by the respective total number of registered patients. This was calculated for 3 separate years.
+To measure this, the volume of prescriptions from all GP practices was sorted by the categories in the Urban Rural Classification 2020. Then each category was divided by the respective total number of registered patients. This was calculated for 3 separate years.
 
 ```{r}
 # The GP Practice Contact Details and List Sizes dataset provides the data zone for each practice. The Urban Rural Classification 2020 assigns rurality by data zones. Therefore, joining by data_zone allows the rurality of each practice to then be determined.
 gp_rurality_classified <- inner_join(gp_details, urban_rural_classification, by = "data_zone") %>%
   select(practice_code, urban_rural8fold2020)
 
-# Yearly prescriptions of DED are calculated.
+# Yearly prescriptions of DED by practice are calculated.
 ded_yearly_summary <- ded_prescriptions %>%
   mutate(year = paid_date_month %/% 100) %>%
   group_by(year, gp_practice) %>%
   summarise(total_paid_quantity = sum(paid_quantity, na.rm = TRUE))
 
-# Practice sizes for each year are calculated for each GP practice.
+# Practice sizes for each year are calculated for each practice.
 gp_yearly_populations <- gp_populations %>%
-  mutate(year = (date %/% 10000)-1) %>%
+  mutate(year = (date %/% 10000)-1) %>% # The choice was made to use population data from January of the next year to represent the entire year more accurately. Therefore 1 must be subtracted.
   filter(sex == "All") %>%
   group_by(year, practice_code) %>%
   summarise(total_all_ages = sum(all_ages, na.rm = TRUE))
 
-# These datasets are joined and show the number of DED prescriptions by GP practice each year.
+# These datasets are joined and show the number of DED prescriptions by GP practice population each year.
 ded_by_population_yearly <- full_join(ded_yearly_summary, gp_yearly_populations, by = c("gp_practice" = "practice_code", "year" = "year"), relationship =
   "many-to-many")
 
@@ -160,7 +160,7 @@ ded_rurality_summary <- full_join(ded_by_population_yearly, gp_rurality_classifi
   group_by(year, urban_rural8fold2020) %>%
   summarise(total_paid_quantity = sum(total_paid_quantity, na.rm = TRUE), 
   total_all_ages = sum(total_all_ages, na.rm = TRUE)) %>%
-  mutate(paid_quantity_perperson = total_paid_quantity / total_all_ages, urban_rural8fold2020 = factor(urban_rural8fold2020, levels = 1:8, labels = c("Large Urban Areas [1]", "Other Urban Areas [2]", "Accessible Small Towns [3]", "Remote Small Towns [4]", "Very Remote Small Towns [5]", "Accessible Rural Areas [6]", "Remote Rural Areas [7]", "Very Remote Rural Areas [8]"))) %>% # Each of the classifications are given their corresponding name.
+  mutate(paid_quantity_perperson = total_paid_quantity / total_all_ages, urban_rural8fold2020 = factor(urban_rural8fold2020, levels = 1:8, labels = c("Large Urban Areas [1]", "Other Urban Areas [2]", "Accessible Small Towns [3]", "Remote Small Towns [4]", "Very Remote Small Towns [5]", "Accessible Rural Areas [6]", "Remote Rural Areas [7]", "Very Remote Rural Areas [8]"))) %>% # Each of the classifications are assigned their corresponding name as a label.
   select(year, urban_rural8fold2020, paid_quantity_perperson) %>%
   pivot_wider(names_from = year, values_from = paid_quantity_perperson) # Converts the data from long to wide format so that each year becomes its own column with the corresponding paid quantity per person.
 
@@ -199,13 +199,13 @@ ded_rurality_summary %>%
   data_color(
     columns = c(`2022`, `2023`, `2024`),
     colors = scales::col_numeric(
-      palette = c("lightyellow", "orange", "brown1"), # This creates a heatmap effect on the table using a colour scale based on paid quantity per person.
+      palette = c("lightyellow", "orange", "brown1"), # This creates a heatmap effect on the table using a colour scale based on paid quantity per person. This heatmap is designed to show the colour changes vertically rather than horizontally.
       domain = NULL))
 ```
 
-In all 3 years the lowest average dosage per person is in Large Urban Areas and the highest is in Remote Small Towns, while the second highest is Very Remote Small Towns. This would indicate that prescription levels are higher in Small Towns, however Accessible Small Towns do not fit this trend. The other results show inconsistent patterns. All the prescriptions decline slightly over the 3-year period. Remote Rural and Very Remote Rural Areas decline noticeably over the 3-year period.
+In all 3 years the lowest average dosage per person is in Large Urban Areas and the highest is in Remote Small Towns, while the second highest is Very Remote Small Towns for 2 out of 3 years. This would indicate that prescription levels are higher in Small Towns, however Accessible Small Towns do not fit this trend. The other results show inconsistent patterns. All the prescriptions decline slightly over the 3-year period. Remote Rural and Very Remote Rural Areas decline noticeably over the 3-year period.
 
-Accessible Small Towns and Urban Areas would be expected to have easier access to medical care and higher pollution, however they show lower prescription levels. Rural areas might be expected to have lower prescriptions and cleaner air, but the prescription levels are inconsistent. However, the pattern is not entirely random as the highest and lowest areas are consistent over three years. This suggests that there may be other factors influencing the results.
+Accessible Small Towns and Urban Areas would be expected to have easier access to medical care and higher pollution, however they show lower prescription levels. Rural areas might be expected to have lower prescriptions and cleaner air, but the prescription levels are inconsistent. However, the pattern is not entirely random as the highest and lowest areas are consistent over 3 years. This suggests that there may be other factors influencing the results.
 
 This study is limited to only 3 years. A more extensive study might reveal more distinct trends. A finer breakdown of categories may also reveal more significant trends. The next steps would be to extend the timescale of the data, for 5 or 10 years, and to use more categories for the urban rural classification.
 
@@ -228,9 +228,9 @@ gp_populations_2024 <- gp_populations %>%
 gp_sex_ratio_2024 <- gp_populations_2024 %>%
     group_by(sex, practice_code, date) %>%
     summarise(total_all_ages = sum(all_ages, na.rm = TRUE)) %>%
-    pivot_wider(names_from = sex, values_from = total_all_ages) %>% # Transforms data from a long to a wide dataset, making Female and Male into columns with the corresponding number of patients.
+    pivot_wider(names_from = sex, values_from = total_all_ages) %>% # Transforms data from a long to a wide format, making Female and Male into columns with the corresponding number of patients.
     mutate(female_to_male_ratio = Female / Male) %>%
-    filter(!is.na(female_to_male_ratio))
+    filter(!is.na(female_to_male_ratio)) # Remove any missing data
 
 # Joins the total paid quantity of each practice in 2024 dataset with the sex ratio by gp dataset. Then it calculates the average paid quantity per person for each practice.
 ded_by_sex_ratio_2024 <- inner_join(ded_by_gp_2024, gp_sex_ratio_2024, by = c("gp_practice" = "practice_code")) %>%
@@ -258,14 +258,14 @@ ded_by_sex_ratio_2024 <- inner_join(ded_by_gp_2024, gp_sex_ratio_2024, by = c("g
 
 The results show a positive relationship. As the ratio of female to male increases in GP practices, there is an increase in the prescription of DED items across GP practices, consistent with previous research.
 
-One limitation is this only looks at the total number of prescriptions in proportion to the number of females and males in each practice and does not show actual prescriptions by sex, which does not guarantee that it is the females who are being prescribed the DED. The next step would be to get data on the actual prescriptions by sex.
+One limitation is this only looks at the total number of prescriptions in proportion to the number of females and males in each practice and does not show actual prescriptions by sex, which does not guarantee that it is the females who are being prescribed the DED items. The next step would be to get data on the actual prescriptions by sex.
 
 ## Age
 
-Studies show that prevalence of DED increases with age, with the majority of sufferers aged over 50 [@hossain2021]. To explore this trend, this study calculated weighted average ages for each GP practice. This was done because the data is provided in age groups and using a weighted average allows it to be plotted in a continuous line. These weighted averages were then compared with the total volume of prescriptions per person of each practice.
+Studies show that prevalence of DED increases with age [@hossain2021]. To explore this trend, this study calculated weighted mean age for each GP practice. This was done because the data is provided in age groups and using a weighted mean allows it to be plotted in a continuous line. These weighted means were then compared with the total volume of prescriptions per person of each practice. A log scale was used to prevent extremes that might stretch the plot.
 
 ```{r}
-# Calculates weighted average ages for each GP practice.
+# Calculates weighted mean ages for each GP practice.
 gp_population_normalised <- gp_populations_2024 %>%
   rowwise() %>% # Performs each row independently
   mutate(weighted_age = (ages0to4*2.5 + ages5to14*10 + ages15to24*20 + ages25to44*34.5 + ages45to64*54.5 + ages65to74*69.5 + ages75to84*79.5 + ages85plus*90) / all_ages) # Weighted age is calculated by taking the middle number in each age group and multiplying that by the number of people in each age group, then dividing by the total ages.
@@ -276,7 +276,7 @@ ded_by_normalised_population <- inner_join(ded_by_gp_2024, gp_population_normali
   mutate(rate_per_person = total_paid_quantity / all_ages) %>%
     filter(!is.na(weighted_age))
 
-# Weighted averages are plotted against the paid quantity per person of each practice. Again, a log scale is used.
+# Weighted means are plotted against the paid quantity per person of each practice. Again, a log scale is used.
 (ggplot(ded_by_normalised_population, aes(x = weighted_age, y = rate_per_person, size = all_ages, color = all_ages)) +
   geom_point(alpha = 0.7) +
   geom_smooth(method = "lm", linetype = "dashed", color = "black", inherit.aes = FALSE, # Standard error is left on.
