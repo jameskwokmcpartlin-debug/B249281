@@ -86,7 +86,7 @@ Studies have shown that DED is more common in patients who spend time outdoors, 
 ded_seasonal_summary <- ded_prescriptions %>%
   mutate(month = paid_date_month %% 100, # Since the dates comes in the format YYYYMM, you can divide by 100 and take the remainder to find the month.
     year = paid_date_month %/% 100, # This gives the year by dividing by 100 and dropping the remainder. The remaining integers is the year.
-    month_name = month.name[month]) %>% # A DRY way to assign the actual name of the month based on the month's corresponding number from 1-12.
+    month_name = month.name[month]) %>% # A DRY way to assign the name of the month based on the month's corresponding number from 1-12.
   group_by(month_name, month, year) %>%
     summarise(total_paid_quantity = sum(paid_quantity)) %>%
   mutate(month_name = factor(month_name, levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")), # Ensures the x-axis of months appears in the correct order.
